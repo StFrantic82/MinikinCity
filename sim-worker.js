@@ -1,5 +1,5 @@
 // Simulations de parties entre IA, en arrière-plan
-importScripts('data.js?v=11', 'engine.js?v=11');
+importScripts('data.js?v=12', 'engine.js?v=12');
 const { Game } = self.MK;
 const D = self.MK_DATA;
 
