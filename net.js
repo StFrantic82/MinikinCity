@@ -42,6 +42,9 @@ const NetLocal = {
   async remove(path) { const pre = 'mk:' + path; for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k === pre || k.startsWith(pre + '/')) localStorage.removeItem(k); } this.fire(path); },
 };
 
+// identifiant de joueur propre à chaque onglet (distinct du compte anonyme Firebase)
+const pid = (() => { try { let p = sessionStorage.getItem('mk-pid'); if (!p) { p = 'p' + Math.random().toString(36).slice(2, 12); sessionStorage.setItem('mk-pid', p); } return p; } catch (e) { return 'p' + Math.random().toString(36).slice(2, 12); } })();
 const localMode = /[?&]local\b/.test(location.search);
 window.MKNet = cfg && !localMode ? NetFirebase : (localMode ? NetLocal : null);
+if (window.MKNet) window.MKNet.pid = pid;
 }

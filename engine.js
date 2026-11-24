@@ -48,7 +48,7 @@ class Game {
   }
 
   // ---------- utilitaires ----------
-  async emit(msg, kind = 'info', who = null) { this.log.push({ msg, kind, who, round: this.round }); await this.onEvent(this, { msg, kind, who }); }
+  async emit(msg, kind = 'info', who = null) { this.log.push({ k: msg[0], a: msg[1], kind, who, round: this.round }); await this.onEvent(this, { msg, kind, who }); }
   async ask(p, kind, data) { return p.agent.choose(kind, data, this, p); }
   draw() { return this.deck.length ? this.deck.pop() : null; }
   toBottom(c) { this.deck.unshift(c); }
@@ -132,7 +132,7 @@ class Game {
   // ---------- actions ----------
   async gainMinikins(p, n, why) {
     if (n <= 0) return;
-    await this.emit(`${p.name} gagne ${n} Minikin${n > 1 ? 's' : ''}${why ? ' (' + why + ')' : ''}.`, 'gain', p.id);
+    await this.emit(['gainM', { p: p.name, n, why }], 'gain', p.id);
     for (let i = 0; i < n; i++) {
       const t = p.city.map((s, k) => k).filter(k => p.city[k].c.spaces > p.city[k].m);
       if (!t.length) { p.pending++; continue; }
@@ -145,29 +145,28 @@ class Game {
   }
   async takeBonus(p, k = 1) {
     for (let i = 0; i < k; i++) {
-      if (!this.bonusSupply.length) { await this.emit('Plus de jeton Bonus disponible.', 'info'); return; }
+      if (!this.bonusSupply.length) { await this.emit(['noBonus', {}], 'info'); return; }
       let idx = await this.ask(p, 'bonus', { options: this.bonusSupply.map((t, i) => i) });
       if (!(idx >= 0 && idx < this.bonusSupply.length)) idx = 0;
       const t = this.bonusSupply.splice(idx, 1)[0];
       p.tokens.push(t);
-      await this.emit(`${p.name} prend le jeton Bonus « ${t.label} ».`, 'gain', p.id);
-      if (t.mPer) { const b = this.base(p); await this.gainMinikins(p, b.col[t.mPer], 'jeton Bonus'); }
+      await this.emit(['takeTok', { p: p.name, tok: t.id }], 'gain', p.id);
+      if (t.mPer) { const b = this.base(p); await this.gainMinikins(p, b.col[t.mPer], ['whyTok', {}]); }
     }
   }
   async drawDiscard(p, n, why) {
     let got = 0; for (let i = 0; i < n; i++) { const c = this.draw(); if (c) { p.hand.push(c); got++; } }
     if (!got) return;
-    await this.emit(`${p.name} pioche ${got} carte${got > 1 ? 's' : ''} puis en remet ${got} sous la pioche${why ? ' (' + why + ')' : ''}.`, 'info', p.id);
+    await this.emit(['drawDisc', { p: p.name, n: got, why }], 'info', p.id);
     const sel = await this.ask(p, 'discard', { n: got, why });
     const idxs = (Array.isArray(sel) && sel.length === got ? sel : AI.choose('discard', { n: got }, this, p)).slice().sort((a, b) => b - a);
     for (const i of idxs) this.toBottom(p.hand.splice(i, 1)[0]);
   }
-  async drawN(p, n, why) { let got = 0; for (let i = 0; i < n; i++) { const c = this.draw(); if (c) { p.hand.push(c); got++; } } if (got) await this.emit(`${p.name} pioche ${got} carte${got > 1 ? 's' : ''}${why ? ' (' + why + ')' : ''}.`, 'info', p.id); }
+  async drawN(p, n, why) { let got = 0; for (let i = 0; i < n; i++) { const c = this.draw(); if (c) { p.hand.push(c); got++; } } if (got) await this.emit(['draw', { p: p.name, n: got, why }], 'info', p.id); }
   async applyReward(p, rw, why) {
     if (rw.vp) { p.markerVp += rw.vp; }
     if (rw.ck) { p.markerCk += rw.ck; }
-    const parts = []; if (rw.vp) parts.push(`${rw.vp} PV`); if (rw.ck) parts.push(`${rw.ck} cocarde${rw.ck > 1 ? 's' : ''}`);
-    if (parts.length) await this.emit(`${p.name} marque ${parts.join(' et ')} (${why}).`, 'gain', p.id);
+    if (rw.vp || rw.ck) await this.emit(['score', { p: p.name, vp: rw.vp || 0, ck: rw.ck || 0, why }], 'gain', p.id);
     if (rw.m) await this.gainMinikins(p, rw.m, why);
     if (rw.bonus) await this.takeBonus(p, rw.bonus);
     if (rw.dd) await this.drawDiscard(p, rw.dd, why);
@@ -179,7 +178,7 @@ class Game {
   }
   async resolveInstant(p, card) {
     if (card.pet === 'mole') {
-      if (p.hand.length) { let i = await this.ask(p, 'extraPlay', { why: 'Mole', optional: false }); if (!(i >= 0 && i < p.hand.length)) i = 0; const c = p.hand.splice(i, 1)[0]; await this.emit(`${p.name} joue aussi ${cardName(c)} dans sa ville (Mole).`, 'play', p.id); await this.placeCard(p, c, true); }
+      if (p.hand.length) { let i = await this.ask(p, 'extraPlay', { why: 'Mole', optional: false }); if (!(i >= 0 && i < p.hand.length)) i = 0; const c = p.hand.splice(i, 1)[0]; await this.emit(['playAlso', { p: p.name, card: c.id, why: 'Mole' }], 'play', p.id); await this.placeCard(p, c, true); }
       await this.drawN(p, 1, 'Mole'); return;
     }
     if (card.pet === 'duck') { await this.drawN(p, 2, 'Duck'); return; }
@@ -189,8 +188,8 @@ class Game {
       const g = this.evalEff(card.eff, x); const v = (g.m || 0) + (g.bonus || 0) * 3;
       if (v > bv) { bv = v; best = g; }
     }
-    if (!best.m && !best.bonus) { await this.emit(`L’effet ⚡ de ${cardName(card)} ne rapporte rien.`, 'info', p.id); return; }
-    if (best.m) await this.gainMinikins(p, best.m, `effet ⚡ ${cardName(card)}`);
+    if (!best.m && !best.bonus) { await this.emit(['instNone', { card: card.id }], 'info', p.id); return; }
+    if (best.m) await this.gainMinikins(p, best.m, ['whyInst', { card: card.id }]);
     if (best.bonus) await this.takeBonus(p, best.bonus);
   }
 
@@ -202,8 +201,8 @@ class Game {
     return {
       round: this.round, phase: this.phase, n: this.n, festOn: this.festOn, wildOn: this.wildOn, best: this.best,
       deckCount: this.deck.length, bonusSupply: this.bonusSupply.map(t => t.id), endTile: this.n,
-      festRow: this.festOn ? this.festRow.map((fr, i) => this.revealed.has(i) ? { n: fr.n, season: fr.season, name: fr.name, fr: fr.fr, shown: true } : { season: fr.season }) : null,
-      fest: f && this.revealed.has(Math.min(this.round, 8)) ? { n: f.n, name: f.name, fr: f.fr } : null,
+      festRow: this.festOn ? this.festRow.map((fr, i) => this.revealed.has(i) ? { n: fr.n, season: fr.season, name: fr.name, shown: true } : { season: fr.season }) : null,
+      fest: f && this.revealed.has(Math.min(this.round, 8)) ? { n: f.n, name: f.name } : null,
       rewardRow: this.rewardRow.map(r => ({ img: r.img, color: r.color })),
       plays: this.plays.map(pl => ({ pid: pl.pid, card: pl.hidden && pl.pid !== seat ? null : pl.card.id, eff: pl.eff ?? null, rank: rk.has(pl) ? rk.get(pl) : -1, value: pl.card.value })),
       display: this.display.map(c => c.id),
@@ -212,7 +211,7 @@ class Game {
         id: p.id, name: p.name, color: p.color, human: p.human, hand: p.id === seat ? p.hand.map(c => c.id) : null, handCount: p.hand.length,
         city: p.city.map(sl => ({ id: sl.c.id, m: sl.m })), pending: p.pending, tokens: p.tokens.map(t => t.id), markerVp: p.markerVp,
         markers: p.markers, total: sc.total, nck: sc.nck, syms: b.s, wS: b.wS }; }),
-      log: this.log.slice(-150).map(l => ({ msg: l.msg, kind: l.kind })),
+      log: this.log.slice(-150).map(l => ({ k: l.k, a: l.a, kind: l.kind })),
       final: this.final ? this.final.map(f => ({ id: f.p.id, name: f.p.name, color: f.p.color, markers: f.markers, tokens: f.tokens, cards: f.cards, cockades: f.cockades, nck: f.nck, pending: f.p.pending, total: f.total })) : null,
     };
   }
@@ -221,7 +220,7 @@ class Game {
   async run() {
     for (const p of this.players) for (let i = 0; i < 6; i++) p.hand.push(this.draw());
     this.phase = 'keep';
-    await this.emit('Chaque joueur reçoit 6 cartes et en garde 4.', 'phase');
+    await this.emit(['deal', {}], 'phase');
     for (const p of this.players) {
       let keep = await this.ask(p, 'keep', { n: 4 });
       if (!Array.isArray(keep) || keep.length !== 4) keep = AI.choose('keep', { n: 4 }, this, p);
@@ -229,13 +228,13 @@ class Game {
       p.hand = kept; rest.forEach(c => this.toBottom(c));
     }
     this.first = Math.floor(this.r() * this.n);
-    await this.emit(`${this.players[this.first].name} commence.`, 'phase');
+    await this.emit(['starts', { p: this.players[this.first].name }], 'phase');
     for (this.round = 0; this.round < 8; this.round++) await this.playRound();
     this.round = 8;
     await this.endgame();
     this.phase = 'over';
     this.final = this.players.map(p => Object.assign({ p }, this.score(p))).sort((a, b) => b.total - a.total || b.p.pending - a.p.pending);
-    await this.emit(`Fin de la partie ! ${this.final[0].p.name} gagne avec ${this.final[0].total} PV.`, 'phase');
+    await this.emit(['over', { p: this.final[0].p.name, n: this.final[0].total }], 'phase');
   }
 
   async playRound() {
@@ -243,15 +242,15 @@ class Game {
     this.best = rc.color; this.plays = []; this.ranking = [];
     this.players.forEach(p => { p.skipTake = false; p.mod = 0; });
     this.phase = 'reveal';
-    await this.emit(`— Manche ${this.round + 1} — meilleure couleur : ${rc.color ? COLOR_FR[rc.color] : 'aucune (carte grise)'}.`, 'phase');
+    await this.emit(['round', { n: this.round + 1, color: rc.color }], 'phase');
     const f = this.fest();
-    if (f) { this.revealed.add(this.round); await this.emit(`Fête : ${f.name} — ${f.fr}`, 'fest'); }
+    if (f) { this.revealed.add(this.round); await this.emit(['fest', { fest: f.n }], 'fest'); }
     if (this.fest(3)) for (const p of this.turnOrder()) await this.drawN(p, 1, f.name);
     if (this.fest(7)) {
       const passed = [];
       for (const p of this.turnOrder()) { let i = await this.ask(p, 'pass', {}); if (!(i >= 0 && i < p.hand.length)) i = 0; passed.push([p, p.hand.splice(i, 1)[0]]); }
       for (const [p, c] of passed) this.players[(p.id + 1) % this.n].hand.push(c);
-      await this.emit('Chaque joueur passe 1 carte à son voisin de gauche.', 'info');
+      await this.emit(['passed', {}], 'info');
     }
     // offre
     this.display = [];
@@ -274,26 +273,26 @@ class Game {
       const play = { pid: p.id, card, from: ch.src, mod: p.mod, hidden: !!lights };
       this.plays.push(play); chosen.push(play);
       if (!lights) {
-        await this.emit(`${p.name} joue ${cardName(card)}${play.from === 'display' ? ' depuis l’offre' : ''}${p.mod ? ` (${p.mod > 0 ? '+' : ''}${p.mod})` : ''}.`, 'play', p.id);
+        await this.emit(['plays', { p: p.name, card: card.id, disp: play.from === 'display', mod: p.mod }], 'play', p.id);
         await this.placeCard(p, card, true);
         if (this.fest(9) && card.value >= 11 && card.value <= 20) await this.drawDiscard(p, 1, 'Tall Tales Night');
-      } else await this.emit(`${p.name} pose une carte face cachée.`, 'play', p.id);
+      } else await this.emit(['faceDown', { p: p.name }], 'play', p.id);
     }
     this.current = null;
     if (lights) {
       for (const pl of chosen) pl.hidden = false;
-      await this.emit('Toutes les cartes sont révélées : ' + chosen.map(pl => `${this.players[pl.pid].name} ${cardName(pl.card)}`).join(', ') + '.', 'play');
+      await this.emit(['reveal', { list: chosen.map(pl => [this.players[pl.pid].name, pl.card.id]) }], 'play');
       for (const pl of chosen) await this.placeCard(this.players[pl.pid], pl.card, true);
     }
-    if (this.fest(14)) { const c = this.plays[0].card.color; this.best = c || null; await this.emit(`La meilleure couleur devient ${c ? COLOR_FR[c] : '— aucune —'} (Sledging).`, 'fest'); }
+    if (this.fest(14)) { const c = this.plays[0].card.color; this.best = c || null; await this.emit(['sled', { color: c || null }], 'fest'); }
     // classement
     this.phase = 'rank';
     this.ranking = this.rank();
     const rows = rc.rows;
-    await this.emit('Classement : ' + this.ranking.map((pl, i) => `${i + 1}. ${this.players[pl.pid].name} (${cardName(pl.card)}, ${pl.eff})`).join(' · '), 'rank');
+    await this.emit(['ranking', { list: this.ranking.map(pl => [this.players[pl.pid].name, pl.card.id, pl.eff]) }], 'rank');
     for (let i = 0; i < this.ranking.length; i++) {
       const p = this.players[this.ranking[i].pid]; p.markers.push({ round: this.round, pos: i });
-      if (rows[i]) await this.applyReward(p, rows[i], `récompense de la manche ${this.round + 1}`);
+      if (rows[i]) await this.applyReward(p, rows[i], ['whyRound', { n: this.round + 1 }]);
     }
     // prendre une carte
     this.phase = 'take';
@@ -303,20 +302,20 @@ class Game {
         this.current = p;
         if (this.fest(2) && this.display.length && p.hand.length) {
           const sw = await this.ask(p, 'swap', {});
-          if (sw && this.display[sw.d] && p.hand[sw.h]) { const h = p.hand[sw.h]; p.hand[sw.h] = this.display[sw.d]; this.display[sw.d] = h; await this.emit(`${p.name} échange une carte de sa main avec l’offre (Swap-a-Petal Fair).`, 'info', p.id); }
+          if (sw && this.display[sw.d] && p.hand[sw.h]) { const h = p.hand[sw.h]; p.hand[sw.h] = this.display[sw.d]; this.display[sw.d] = h; await this.emit(['swapped', { p: p.name }], 'info', p.id); }
         }
         const deckOpt = this.has(p, 'hedgehog') && this.deck.length > 0;
         if (!this.display.length && !deckOpt) continue;
         let t = await this.ask(p, 'take', { deck: deckOpt });
-        if (t === 'deck' && deckOpt) { p.hand.push(this.draw()); await this.emit(`${p.name} pioche dans la pioche (Hedgehog).`, 'take', p.id); }
-        else { if (!(t >= 0 && t < this.display.length)) t = 0; if (this.display.length) { const c = this.display.splice(t, 1)[0]; p.hand.push(c); await this.emit(`${p.name} prend ${cardName(c)}.`, 'take', p.id); } }
+        if (t === 'deck' && deckOpt) { p.hand.push(this.draw()); await this.emit(['deckTake', { p: p.name }], 'take', p.id); }
+        else { if (!(t >= 0 && t < this.display.length)) t = 0; if (this.display.length) { const c = this.display.splice(t, 1)[0]; p.hand.push(c); await this.emit(['takes', { p: p.name, card: c.id }], 'take', p.id); } }
       }
     }
     this.current = null;
     // escargot puis défausse de l’offre
     if (this.display.length) {
       const owner = this.turnOrder().find(p => this.has(p, 'snail'));
-      if (owner) { const i = AI.bestIndex(this.display.map(c => AI.cityValue(this, owner, c) + c.value * 0.05)); const c = this.display.splice(i, 1)[0]; owner.hand.push(c); await this.emit(`${owner.name} récupère ${cardName(c)} (Snail).`, 'take', owner.id); }
+      if (owner) { const i = AI.bestIndex(this.display.map(c => AI.cityValue(this, owner, c) + c.value * 0.05)); const c = this.display.splice(i, 1)[0]; owner.hand.push(c); await this.emit(['snail', { p: owner.name, card: c.id }], 'take', owner.id); }
       this.display.forEach(c => this.toBottom(c)); this.display = [];
     }
     // effets de fin de manche
@@ -325,7 +324,7 @@ class Game {
       if (this.has(p, 'magpie')) await this.drawDiscard(p, 1, 'Magpie');
       if (this.has(p, 'tortoise')) {
         const mv = await this.ask(p, 'tortoise', {});
-        if (mv && p.city[mv.from] && p.city[mv.to] && p.city[mv.from].m > 0 && p.city[mv.to].m < p.city[mv.to].c.spaces && mv.from !== mv.to) { p.city[mv.from].m--; p.city[mv.to].m++; await this.emit(`${p.name} déplace un Minikin (Tortoise).`, 'info', p.id); }
+        if (mv && p.city[mv.from] && p.city[mv.to] && p.city[mv.from].m > 0 && p.city[mv.to].m < p.city[mv.to].c.spaces && mv.from !== mv.to) { p.city[mv.from].m--; p.city[mv.to].m++; await this.emit(['tortoise', { p: p.name }], 'info', p.id); }
       }
     }
     this.first = this.ranking[0].pid;
@@ -355,23 +354,23 @@ class Game {
 
   async endgame() {
     const f = this.fest();
-    if (f) { this.revealed.add(8); await this.emit(`— Nouvel An — ${f.name} : ${f.fr}`, 'fest'); }
+    if (f) { this.revealed.add(8); await this.emit(['newyear', { fest: f.n }], 'fest'); }
     if (this.fest(17)) {
       this.phase = 'play';
-      for (const p of this.turnOrder()) if (p.hand.length) { let i = await this.ask(p, 'extraPlay', { why: 'Midnight Rush', optional: false }); if (!(i >= 0 && i < p.hand.length)) i = 0; const c = p.hand.splice(i, 1)[0]; await this.emit(`${p.name} joue ${cardName(c)} (Midnight Rush).`, 'play', p.id); await this.placeCard(p, c, true); }
+      for (const p of this.turnOrder()) if (p.hand.length) { let i = await this.ask(p, 'extraPlay', { why: 'Midnight Rush', optional: false }); if (!(i >= 0 && i < p.hand.length)) i = 0; const c = p.hand.splice(i, 1)[0]; await this.emit(['playAlso', { p: p.name, card: c.id, why: 'Midnight Rush' }], 'play', p.id); await this.placeCard(p, c, true); }
     }
     this.phase = 'endrank';
     const col = this.rewardRow[8].color; this.best = col;
     const order = this.turnOrder();
     const tot = order.map((p, i) => { const cs = p.hand.filter(c => col ? c.color === col : true); return { p, i, total: cs.reduce((a, c) => a + c.value, 0), has: cs.length > 0 }; });
-    await this.emit(`Classement final (${col ? 'cartes ' + COLOR_FR[col] + 'es' : 'toute la main'}) : ` + tot.map(t => `${t.p.name} ${t.total}`).join(', ') + '.', 'rank');
+    await this.emit(['endRank', { color: col, list: tot.map(t => [t.p.name, t.total]) }], 'rank');
     const less = this.fest(18);
     tot.sort((a, b) => less ? ((b.has - a.has) || (a.total - b.total) || (a.i - b.i)) : ((b.total - a.total) || (a.i - b.i)));
     this.endRanking = tot;
     for (let k = 0; k < tot.length; k++) {
       const p = tot[k].p, rw = this.endTile[k]; p.markers.push({ round: 8, pos: k }); if (!rw) continue;
-      await this.applyReward(p, rw, 'tuile de fin de partie');
-      if (rw.play && p.hand.length) { const i = await this.ask(p, 'extraPlay', { why: 'tuile de fin de partie', optional: true }); if (i >= 0 && i < p.hand.length) { const c = p.hand.splice(i, 1)[0]; await this.emit(`${p.name} joue une carte supplémentaire : ${cardName(c)}.`, 'play', p.id); await this.placeCard(p, c, true); } }
+      await this.applyReward(p, rw, ['whyEnd', {}]);
+      if (rw.play && p.hand.length) { const i = await this.ask(p, 'extraPlay', { why: ['whyEnd', {}], optional: true }); if (i >= 0 && i < p.hand.length) { const c = p.hand.splice(i, 1)[0]; await this.emit(['extraCard', { p: p.name, card: c.id }], 'play', p.id); await this.placeCard(p, c, true); } }
     }
   }
 }

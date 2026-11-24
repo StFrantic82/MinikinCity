@@ -10,6 +10,42 @@ const TOK = Object.fromEntries(D.BONUS.map(t => [t.id, t]));
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
+// ---------- langues ----------
+const I18N = window.MK_I18N;
+let LANG = (() => { try { const l = localStorage.getItem('mk-lang'); if (l && I18N[l]) return l; } catch (e) {} const n = (navigator.language || 'fr').slice(0, 2); return I18N[n] ? n : 'en'; })();
+const LD = () => I18N[LANG];
+function t(k, a = {}) { let v = LD()[k]; if (v === undefined) v = I18N.fr[k]; if (v === undefined) return k; if (typeof v === 'function') return v(a); return String(v).replace(/\{(\w+)\}/g, (m, x) => a[x] ?? ''); }
+function cardN(id) { const c = CARD[id]; if (!c) return '?'; if (c.name) return c.name; if (c.id === 'x21') return '21'; return `${LD().color[c.color]} ${c.value}`; }
+function festText(n) { return LANG === 'fr' ? D.FESTIVALS[n - 1].fr : I18N.FEST[LANG][n - 1]; }
+function whyT(w) { if (!w) return ''; if (Array.isArray(w)) return logT(w[0], w[1]); return String(w); }
+function logT(k, a0) {
+  const a = Object.assign({}, a0 || {});
+  if (a.card) a.card = cardN(a.card);
+  if ('color' in a) { const c = a.color; a.color = c ? LD().color[c] : null; a.colorPl = c ? LD().colorPl[c] : null; }
+  if (a.tok) a.tok = LD().tok[a.tok];
+  if (a.fest) a.fest = `${D.FESTIVALS[a.fest - 1].name} — ${festText(a.fest)}`;
+  if (a.why) a.why = whyT(a.why);
+  if (a.list) {
+    if (k === 'reveal') a.list = a.list.map(([p, c]) => `${p} ${cardN(c)}`).join(', ');
+    else if (k === 'ranking') a.list = a.list.map(([p, c, e], i) => `${i + 1}. ${p} (${cardN(c)}, ${e})`).join(' · ');
+    else if (k === 'endRank') a.list = a.list.map(([p, n]) => `${p} ${n}`).join(', ');
+  }
+  const f = LD().log[k] || I18N.fr.log[k];
+  return f ? f(a) : k;
+}
+function applyStatic() {
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+  document.querySelectorAll('.langs').forEach(el => { el.innerHTML = ['fr', 'en', 'it'].map(l => `<button type="button" data-lang="${l}" aria-pressed="${l === LANG}">${l.toUpperCase()}</button>`).join(''); });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-lang]'); if (!b) return;
+  const old = t('defaultName'); LANG = b.dataset.lang; try { localStorage.setItem('mk-lang', LANG); } catch (err) {}
+  if ($('pname').value === old || ['Moi', 'Me', 'Io'].includes($('pname').value)) $('pname').value = t('defaultName');
+  applyStatic(); drawSeg(); if ($('stats').style.display !== 'none') { drawStatCtl(); drawStats(); } if (meta && $('lobby').style.display !== 'none') lobby(); render(); if (P && P.kind === 'bonus') bonusModal(); if (V && V.final && $('modal').innerHTML) endModal();
+});
+
 // mode : 'solo' | 'host' | 'client'
 let mode = 'solo', G = null, V = null, P = null, ME = 0, nPlayers = 3, tab = 'solo';
 let room = null, unsub = [], remote = {}, remoteSeats = new Set(), promptSeq = 0;
@@ -18,16 +54,18 @@ let room = null, unsub = [], remote = {}, remoteSeats = new Set(), promptSeq = 0
 try { const s = JSON.parse(localStorage.getItem('mk-setup') || '{}'); if (s.n) nPlayers = s.n; if (s.name) $('pname').value = s.name; $('xfest').checked = !!s.fest; $('xwild').checked = !!s.wild; } catch (e) {}
 function drawSeg() {
   $('nseg').innerHTML = [2, 3, 4, 5].map(n => `<button type="button" aria-pressed="${n === nPlayers}" data-n="${n}">${n}</button>`).join('');
-  $('tabs').innerHTML = ['solo', 'online'].map(t => `<button type="button" aria-pressed="${t === tab}" data-tab="${t}">${t === 'solo' ? 'Contre l’ordinateur' : 'En ligne'}</button>`).join('');
+  $('tabs').innerHTML = ['solo', 'online', 'stats'].map(tb => `<button type="button" aria-pressed="${tb === tab}" data-tab="${tb}">${tb === 'solo' ? t('tabSolo') : tb === 'online' ? t('tabOnline') : t('tabStats')}</button>`).join('');
   $('soloBox').style.display = tab === 'solo' ? '' : 'none';
   $('onlineBox').style.display = tab === 'online' ? '' : 'none';
-  $('nhint').textContent = tab === 'solo' ? 'Vous jouez contre des Minikins pilotés par l’ordinateur.' : 'Les places non prises par des amis seront jouées par l’ordinateur.';
+  $('nhint').textContent = tab === 'solo' ? t('hintSolo') : t('hintOnline');
   $('netoff').style.display = NET ? 'none' : '';
   $('create').disabled = !NET; $('join').disabled = !NET;
 }
+applyStatic();
+if (!$('pname').value) $('pname').value = t('defaultName');
 drawSeg();
 $('nseg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { nPlayers = +b.dataset.n; drawSeg(); } });
-$('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { tab = b.dataset.tab; drawSeg(); } });
+$('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.tab === 'stats') { openStats(); return; } tab = b.dataset.tab; drawSeg(); });
 $('start').addEventListener('click', startSolo);
 $('create').addEventListener('click', createRoom);
 $('join').addEventListener('click', joinRoom);
@@ -38,12 +76,12 @@ const params = new URLSearchParams(location.search);
 if (params.get('room')) { tab = 'online'; $('rcode').value = params.get('room').toUpperCase(); drawSeg(); }
 
 function settings() {
-  const name = ($('pname').value || 'Moi').trim().slice(0, 16);
+  const name = ($('pname').value || t('defaultName')).trim().slice(0, 16);
   const fest = $('xfest').checked, wild = $('xwild').checked;
   try { localStorage.setItem('mk-setup', JSON.stringify({ n: nPlayers, name, fest, wild })); } catch (e) {}
   return { name, fest, wild, n: nPlayers };
 }
-function show(id) { for (const s of ['setup', 'lobby', 'game']) $(s).style.display = s === id ? (s === 'game' ? 'block' : 'grid') : 'none'; }
+function show(id) { for (const s of ['setup', 'lobby', 'game', 'stats']) $(s).style.display = s === id ? (s === 'game' || s === 'stats' ? 'block' : 'grid') : 'none'; }
 function backToMenu() { unsub.forEach(f => f()); unsub = []; G = null; V = null; P = null; room = null; remote = {}; remoteSeats = new Set(); mode = 'solo'; $('modal').innerHTML = ''; show('setup'); }
 
 // ---------- solo ----------
@@ -92,10 +130,10 @@ const code5 = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[M
 let meta = null;
 async function createRoom() {
   const s = settings();
-  try { $('netmsg').textContent = 'Connexion…'; await NET.init(); } catch (e) { $('netmsg').textContent = 'Connexion impossible : ' + e.message; return; }
+  try { $('netmsg').textContent = t('connecting'); await NET.init(); } catch (e) { $('netmsg').textContent = t('connFail', { e: e.message }); return; }
   mode = 'host'; ME = 0; room = code5();
-  meta = { host: NET.uid, status: 'lobby', n: s.n, fest: s.fest, wild: s.wild, created: Date.now(),
-    seats: Array.from({ length: s.n }, (_, i) => i === 0 ? { name: s.name, kind: 'host', uid: NET.uid } : { name: AI_NAMES[i - 1], kind: 'ai' }) };
+  meta = { host: NET.pid, status: 'lobby', n: s.n, fest: s.fest, wild: s.wild, created: Date.now(),
+    seats: Array.from({ length: s.n }, (_, i) => i === 0 ? { name: s.name, kind: 'host', uid: NET.pid } : { name: AI_NAMES[i - 1], kind: 'ai' }) };
   await NET.set(`rooms/${room}/meta`, JSON.stringify(meta));
   unsub.push(NET.on(`rooms/${room}/joins`, (joins) => {
     if (!joins || !meta || meta.status !== 'lobby') return;
@@ -114,38 +152,38 @@ async function createRoom() {
 }
 async function joinRoom() {
   const s = settings(); const code = ($('rcode').value || '').trim().toUpperCase();
-  if (code.length < 4) { $('netmsg').textContent = 'Entrez le code de la salle.'; return; }
-  try { $('netmsg').textContent = 'Connexion…'; await NET.init(); } catch (e) { $('netmsg').textContent = 'Connexion impossible : ' + e.message; return; }
+  if (code.length < 4) { $('netmsg').textContent = t('enterCode'); return; }
+  try { $('netmsg').textContent = t('connecting'); await NET.init(); } catch (e) { $('netmsg').textContent = t('connFail', { e: e.message }); return; }
   const m = await NET.get(`rooms/${code}/meta`);
-  if (!m) { $('netmsg').textContent = 'Aucune salle avec ce code.'; return; }
+  if (!m) { $('netmsg').textContent = t('noRoom'); return; }
   const mm = JSON.parse(m);
-  if (mm.status !== 'lobby' && !mm.seats.some(x => x.uid === NET.uid)) { $('netmsg').textContent = 'Cette partie a déjà commencé.'; return; }
+  if (mm.status !== 'lobby' && !mm.seats.some(x => x.uid === NET.pid)) { $('netmsg').textContent = t('started'); return; }
   mode = 'client'; room = code; $('netmsg').textContent = '';
-  await NET.set(`rooms/${room}/joins/${NET.uid}`, s.name);
+  await NET.set(`rooms/${room}/joins/${NET.pid}`, s.name);
   let attached = false;
   unsub.push(NET.on(`rooms/${room}/meta`, (raw) => {
     if (!raw) return; meta = JSON.parse(raw);
-    const seat = meta.seats.findIndex(x => x.uid === NET.uid);
-    if (seat < 0) { lobby('La salle est complète.'); return; }
+    const seat = meta.seats.findIndex(x => x.uid === NET.pid);
+    if (seat < 0) { lobby(t('full')); return; }
     ME = seat;
     if (meta.status === 'lobby') { show('lobby'); lobby(); return; }
     if (!attached) { attached = true; attachClient(); }
   }));
-  show('lobby'); lobby('En attente de la réponse de l’hôte…');
+  show('lobby'); lobby(t('waitHost'));
 }
 function lobby(msg) {
   if (!meta) return;
   const isHost = mode === 'host';
   const link = location.href.split('?')[0] + '?room=' + room;
   $('lobbyBody').innerHTML = `
-    <p class="ttl" style="font-size:15px;color:var(--soft)">Code de la salle</p>
+    <p class="ttl" style="font-size:15px;color:var(--soft)">${t('roomCode')}</p>
     <div class="code">${room}</div>
-    <p style="color:var(--soft);font-size:14px;overflow-wrap:anywhere">Lien à envoyer : <b>${esc(link)}</b></p>
-    <p style="margin:10px 0 6px"><b>${meta.n} joueurs</b> · Festivals ${meta.fest ? 'oui' : 'non'} · Wild Friends ${meta.wild ? 'oui' : 'non'}</p>
-    <ul class="seats">${meta.seats.map((x, i) => `<li><span class="dot" style="background:${COLORS[i]}"></span><b>${esc(x.name)}</b><span>${x.kind === 'host' ? 'hôte' : x.kind === 'remote' ? 'en ligne' : 'ordinateur'}${i === ME ? ' · vous' : ''}</span></li>`).join('')}</ul>
-    <p style="color:var(--soft)">${msg ? esc(msg) : isHost ? 'Les places marquées « ordinateur » seront jouées par l’IA.' : 'En attente du lancement par l’hôte…'}</p>`;
+    <p style="color:var(--soft);font-size:14px;overflow-wrap:anywhere">${t('linkSend')} <b>${esc(link)}</b></p>
+    <p style="margin:10px 0 6px"><b>${t('nPlayers', { n: meta.n })}</b> · Wild Friends ${meta.wild ? t('yes') : t('no')} · Festivals ${meta.fest ? t('yes') : t('no')}</p>
+    <ul class="seats">${meta.seats.map((x, i) => `<li><span class="dot" style="background:${COLORS[i]}"></span><b>${esc(x.name)}</b><span>${x.kind === 'host' ? t('seatHost') : x.kind === 'remote' ? t('seatRemote') : t('seatAI')}${i === ME ? ' · ' + t('you') : ''}</span></li>`).join('')}</ul>
+    <p style="color:var(--soft)">${msg ? esc(msg) : isHost ? t('lobbyHostHint') : t('lobbyWait')}</p>`;
   $('lobbyStart').style.display = isHost ? '' : 'none';
-  $('lobbyCopy').onclick = () => { try { navigator.clipboard.writeText(link); $('lobbyCopy').textContent = 'Lien copié'; } catch (e) {} };
+  $('lobbyCopy').onclick = () => { try { navigator.clipboard.writeText(link); $('lobbyCopy').textContent = t('copied'); } catch (e) {} };
 }
 function remoteAgent(seat) {
   return { choose(kind, d) {
@@ -176,7 +214,7 @@ function takeOver(seat) {
   const w = remote[seat]; if (!w || !G) return;
   const p = G.players[seat]; p.agent = AI; remote[seat] = null;
   NET.set(`rooms/${room}/prompts/${seat}`, null);
-  G.emit(`${p.name} est remplacé par l’ordinateur.`, 'info');
+  G.emit(['replaced', { p: p.name }], 'info');
   w.res(AI.choose(w.kind, w.d, G, p));
 }
 function attachClient() {
@@ -198,35 +236,36 @@ function cardBox(id, o = {}) {
   const src = o.back || !c ? 'img/back.jpg' : img(id);
   const attrs = o.click ? ` tabindex="0" role="button" data-act="${o.act}" data-i="${o.i}"` : '';
   const zoom = o.back || !c ? '' : ` data-zoom="${src}"`;
-  return `<div class="${cls}"${attrs}${zoom}><img src="${src}" alt="${o.back || !c ? 'carte cachée' : cardName(c)}">${o.extra || ''}</div>`;
+  return `<div class="${cls}"${attrs}${zoom}><img src="${src}" alt="${o.back || !c ? t('hiddenCard') : cardN(id)}">${o.extra || ''}</div>`;
 }
-function minis(sl) { const c = CARD[sl.id]; if (!c.spaces) return ''; let s = ''; for (let i = 0; i < c.spaces; i++) s += `<i class="${i < sl.m ? 'f' : ''}"></i>`; return `<span class="minis">${s}</span>`; }
+const PAWNS = ['pink', 'green', 'white', 'acorn'];
+function minis(sl) { const c = CARD[sl.id]; if (!c.spaces) return ''; let s = ''; for (let i = 0; i < c.spaces; i++) s += i < sl.m ? `<img class="pw" src="img/pawn_${PAWNS[(i + c.value) % 4]}.png" alt="Minikin">` : '<span class="free"></span>'; return `<span class="minis">${s}</span>`; }
 const ICON = { H: 'heart', S: 'smile', G: 'bag', B: 'book' };
 function tokHtml(id) {
-  const t = TOK[id];
-  const ic = t.sym ? ICON[t.sym] : t.vp ? 'laurel' : t.ck ? 'cockade' : t.wildColor ? 'ctri_wf' : 'minikin';
-  return `<span class="tok"><img src="img/icons/${ic}.png" alt="">${t.label}</span>`;
+  const tk = TOK[id];
+  const ic = tk.sym ? ICON[tk.sym] : tk.vp ? 'laurel' : tk.ck ? 'cockade' : tk.wildColor ? 'ctri_wf' : 'minikin';
+  return `<span class="tok"><img src="img/icons/${ic}.png" alt="">${LD().tok[id]}</span>`;
 }
-const rowStart = (n) => ({ 5: 0.16, 4: 0.176, 3: 0.207, 2: 0.207 })[n];
+const rowStart = (n) => ({ 5: 0.198, 4: 0.212, 3: 0.238, 2: 0.239 })[n];
 const full = (sl) => CARD[sl.id].spaces && sl.m >= CARD[sl.id].spaces;
 
 function render() {
   if (!V) return;
   const me = V.players[ME];
-  const rd = V.round < 0 ? 'Mise en place' : V.round < 8 ? `Manche ${V.round + 1} / 8` : 'Nouvel An';
+  const rd = V.round < 0 ? t('setupPhase') : V.round < 8 ? t('roundN', { n: V.round + 1 }) : t('newYear');
   const cur = V.current !== null ? V.players[V.current] : null;
-  const who = cur ? (cur.id === ME ? 'À vous' : `${cur.name} réfléchit…`) : '';
-  $('status').textContent = [rd, who, mode !== 'solo' ? `salle ${room}` : ''].filter(Boolean).join(' · ');
+  const who = cur ? (cur.id === ME ? t('yourTurn') : t('thinking', { p: cur.name })) : '';
+  $('status').textContent = [rd, who, mode !== 'solo' ? t('room', { c: room }) : ''].filter(Boolean).join(' · ');
   // l’année
   let y = '';
   for (let i = 0; i < 9; i++) {
     const rc = V.rewardRow[i];
     let fest = '';
-    if (V.festOn) { const fr = V.festRow[i]; const src = fr.shown ? `img/f${fr.n}.jpg` : `img/fb_${fr.season}.jpg`; fest = `<img class="fest" src="${src}" alt="${fr.shown ? esc(fr.name) : 'fête cachée'}"${fr.shown ? ` data-zoom="${src}"` : ''}>`; }
+    if (V.festOn) { const fr = V.festRow[i]; const src = fr.shown ? `img/f${fr.n}.jpg` : `img/fb_${fr.season}.jpg`; fest = `<img class="fest" src="${src}" alt="${fr.shown ? esc(fr.name) : t('hiddenFest')}"${fr.shown ? ` data-zoom="${src}"` : ''}>`; }
     let mk = '';
-    if (i < 8) for (const p of V.players) for (const m of p.markers) if (m.round === i) mk += `<span class="mk" style="top:${(rowStart(V.n) + m.pos * 0.15) * 100}%;background:${p.color}" title="${esc(p.name)}"></span>`;
-    const tile = i === 8 ? `<img class="tile" src="img/end_${V.n}.jpg" alt="tuile de fin de partie" data-zoom="img/end_${V.n}.jpg">` : '';
-    y += `<div class="ycol ${i === V.round ? 'now' : ''}"><span class="n">${i < 8 ? i + 1 : 'Fin'}</span>${fest}<div class="rcard"><img src="img/${rc.img}.jpg" alt="carte Récompense" data-zoom="img/${rc.img}.jpg">${tile}${mk}</div></div>`;
+    if (i < 8) for (const p of V.players) for (const m of p.markers) if (m.round === i) mk += `<span class="mk" style="top:${(rowStart(V.n) + m.pos * 0.1325) * 100}%;background:${p.color}" title="${esc(p.name)}"></span>`;
+    const tile = i === 8 ? `<img class="tile" src="img/end_${V.n}.jpg" alt="${t('endTile')}" data-zoom="img/end_${V.n}.jpg">` : '';
+    y += `<div class="ycol ${i === V.round ? 'now' : ''}"><span class="n">${i < 8 ? i + 1 : t('endCol')}</span>${fest}<div class="rcard"><img src="img/${rc.img}.jpg" alt="${t('rewardCard')}" data-zoom="img/${rc.img}.jpg">${tile}${mk}</div></div>`;
   }
   $('year').innerHTML = y;
   // cartes jouées
@@ -234,14 +273,14 @@ function render() {
     const p = V.players[pl.pid];
     const extra = `<span class="who" style="color:${p.color === '#f5c518' ? 'inherit' : p.color}">${esc(p.name)}</span>` + (pl.rank >= 0 ? `<span class="rk">${pl.rank + 1}</span>` : '') + (pl.rank >= 0 && pl.eff !== pl.value ? `<span class="ev">${pl.eff}</span>` : '');
     return cardBox(pl.card, { back: !pl.card, extra });
-  }).join('') : '<p style="color:var(--soft)">Aucune carte jouée pour l’instant.</p>';
-  $('bestc').textContent = V.round >= 0 ? `Meilleure couleur : ${V.best ? COLOR_FR[V.best] : 'aucune'}` : '';
+  }).join('') : `<p style="color:var(--soft)">${t('noPlays')}</p>`;
+  $('bestc').textContent = V.round >= 0 ? t('best', { c: V.best ? LD().color[V.best] : t('none') }) : '';
   // offre
   const canTake = P && (P.kind === 'take' || (P.kind === 'swap' && P.sel.length === 1) || (P.kind === 'play' && P.d.early));
-  $('display').innerHTML = V.display.length ? V.display.map((id, i) => cardBox(id, { click: canTake, act: 'display', i })).join('') : '<p style="color:var(--soft)">Vide</p>';
-  $('deckc').textContent = `Pioche : ${V.deckCount} cartes · Jetons Bonus : ${V.bonusSupply.length}`;
+  $('display').innerHTML = V.display.length ? V.display.map((id, i) => cardBox(id, { click: canTake, act: 'display', i })).join('') : `<p style="color:var(--soft)">${t('empty')}</p>`;
+  $('deckc').textContent = t('deckInfo', { n: V.deckCount, b: V.bonusSupply.length });
   // moi
-  $('mehead').innerHTML = `<span class="dot" style="background:${me.color}"></span> Votre ville <small>score actuel ${me.total} PV</small>`;
+  $('mehead').innerHTML = `<span class="dot" style="background:${me.color}"></span> ${t('yourCity')} <small>${t('scoreNow', { n: me.total })}</small>`;
   $('mestats').innerHTML = statLine(me) + (me.tokens.length ? ' ' + me.tokens.map(tokHtml).join('') : '');
   const placeT = P && P.kind === 'placeMinikin' ? P.d.targets : null;
   const tort = P && P.kind === 'tortoise';
@@ -249,43 +288,44 @@ function render() {
     const sp = CARD[s.id].spaces;
     const click = (placeT && placeT.includes(i)) || (tort && (P.sel.length === 0 ? s.m > 0 : s.m < sp && i !== P.sel[0]));
     return cardBox(s.id, { click, act: 'city', i, extra: minis(s), done: full(s), sel: tort && P.sel[0] === i });
-  }).join('') : '<p style="color:var(--soft)">Votre ville est encore vide.</p>';
+  }).join('') : `<p style="color:var(--soft)">${t('emptyCity')}</p>`;
   const handAct = P && ['keep', 'play', 'discard', 'pass', 'extraPlay', 'swap'].includes(P.kind);
   $('myhand').innerHTML = (me.hand || []).map((id, i) => cardBox(id, { size: 'lg', click: handAct && !(P.kind === 'swap' && P.sel.length), act: 'hand', i, sel: P && P.sel.includes(i) && P.kind !== 'tortoise' })).join('');
   // adversaires
   $('opps').innerHTML = V.players.filter(p => p.id !== ME).map(p => {
     const waiting = mode === 'host' && remote[p.id];
-    return `<div class="zone opp"><h3><span class="dot" style="background:${p.color}"></span>${esc(p.name)} <small>${p.total} PV · ${p.handCount} cartes en main</small></h3>
+    return `<div class="zone opp"><h3><span class="dot" style="background:${p.color}"></span>${esc(p.name)} <small>${t('oppSmall', { n: p.total, h: p.handCount })}</small></h3>
       <div class="stats">${statLine(p)}</div>${p.tokens.length ? `<div class="tokens" style="margin-bottom:8px">${p.tokens.map(tokHtml).join('')}</div>` : ''}
-      ${waiting ? `<p style="margin:0 0 8px;font-weight:700">En attente de ${esc(p.name)}… <button class="ghost" data-take="${p.id}" style="min-height:34px;padding:4px 10px">Faire jouer l’ordinateur</button></p>` : ''}
-      <div class="row">${p.city.map(sl => cardBox(sl.id, { size: 'sm', extra: minis(sl), done: full(sl) })).join('') || '<span style="color:var(--soft)">Ville vide</span>'}</div></div>`;
+      ${waiting ? `<p style="margin:0 0 8px;font-weight:700">${esc(t('waitingFor', { p: p.name }))} <button class="ghost" data-take="${p.id}" style="min-height:34px;padding:4px 10px">${t('aiPlay')}</button></p>` : ''}
+      <div class="row">${p.city.map(sl => cardBox(sl.id, { size: 'sm', extra: minis(sl), done: full(sl) })).join('') || `<span style="color:var(--soft)">${t('emptyCityOpp')}</span>`}</div></div>`;
   }).join('');
   // fête
   $('festzone').style.display = V.festOn ? '' : 'none';
-  $('festnow').innerHTML = V.fest ? `<div class="festnow"><img src="img/f${V.fest.n}.jpg" alt="${esc(V.fest.name)}" data-zoom="img/f${V.fest.n}.jpg"><div><b class="ttl">${esc(V.fest.name)}</b><br>${esc(V.fest.fr)}</div></div>` : '<p style="color:var(--soft)">Révélée au début de chaque manche.</p>';
-  $('log').innerHTML = V.log.slice().reverse().map(l => `<div class="${l.kind}">${esc(l.msg)}</div>`).join('');
+  $('festnow').innerHTML = V.fest ? `<div class="festnow"><img src="img/f${V.fest.n}.jpg" alt="${esc(V.fest.name)}" data-zoom="img/f${V.fest.n}.jpg"><div><b class="ttl">${esc(V.fest.name)}</b><br>${esc(festText(V.fest.n))}</div></div>` : `<p style="color:var(--soft)">${t('festReveal')}</p>`;
+  $('log').innerHTML = V.log.slice().reverse().map(l => `<div class="${l.kind}">${esc(logT(l.k, l.a))}</div>`).join('');
   $('prompt').innerHTML = P ? promptHtml() : '';
 }
 function statLine(p) {
-  const syms = ['B', 'S', 'G', 'H'].map(k => `<span><img class="ico" src="img/icons/${ICON[k]}.png" alt="${({ B: 'livres', S: 'sourires', G: 'bourses', H: 'cœurs' })[k]}"> ${p.syms[k]}</span>`).join('') + (p.wS ? `<span title="symbole au choix">+${p.wS} au choix</span>` : '');
-  return syms + `<span><img class="ico" src="img/icons/laurel.png" alt=""> ${p.markerVp} PV de récompenses</span><span><img class="ico" src="img/icons/cockade.png" alt=""> ${p.nck} cocarde${p.nck > 1 ? 's' : ''}</span><span><img class="ico" src="img/icons/minikin.png" alt=""> ${p.pending} en attente</span>`;
+  const syms = ['B', 'S', 'G', 'H'].map(k => `<span><img class="ico" src="img/icons/${ICON[k]}.png" alt="${t('sym' + k)}"> ${p.syms[k]}</span>`).join('') + (p.wS ? `<span>${t('statWild', { n: p.wS })}</span>` : '');
+  return syms + `<span><img class="ico" src="img/icons/laurel.png" alt=""> ${t('statVp', { n: p.markerVp })}</span><span><img class="ico" src="img/icons/cockade.png" alt=""> ${t('statCk', { n: p.nck })}</span><span><img class="ico" src="img/pawn_green.png" alt=""> ${t('statPend', { n: p.pending })}</span>`;
 }
 
 function promptHtml() {
   const d = P.d;
-  const q = (t, btns = '') => `<span class="q">${t}</span>${btns}`;
+  const q = (txt, btns = '') => `<span class="q">${esc(txt)}</span>${btns}`;
+  const B = (v, k, ghost) => `<button data-btn="${v}"${ghost ? ' class="ghost"' : ''}>${t(k)}</button>`;
   switch (P.kind) {
-    case 'keep': return q(`Gardez 4 cartes sur 6 : sélectionnez-en 4 (${P.sel.length}/4).`, `<button data-btn="ok" ${P.sel.length === 4 ? '' : 'disabled'}>Valider</button>`);
-    case 'play': return q(d.hidden ? 'Lights-Out Party : choisissez votre carte, elle sera révélée avec les autres.' : d.early ? 'Jouez une carte de votre main, ou de l’offre (Early Worm Market : vous ne prendrez alors pas de nouvelle carte).' : 'À vous : jouez une carte de votre main.');
-    case 'chipmunk': return q(`Chipmunk : modifier la valeur de ${cardName(CARD[d.card])} pour le classement ?`, `<button data-btn="2">+2</button><button data-btn="0" class="ghost">Aucun</button><button data-btn="-2" class="ghost">−2</button>`);
-    case 'placeMinikin': return q(`Placez un Minikin sur un bâtiment surligné (encore ${d.left}).`, `<button data-btn="auto" class="ghost">Placer automatiquement</button>`);
-    case 'bonus': return q('Choisissez un jeton Bonus.');
-    case 'discard': return q(`${d.why ? d.why + ' : ' : ''}choisissez ${d.n} carte${d.n > 1 ? 's' : ''} à remettre sous la pioche (${P.sel.length}/${d.n}).`, `<button data-btn="ok" ${P.sel.length === d.n ? '' : 'disabled'}>Valider</button>`);
-    case 'take': return q('Prenez une nouvelle carte dans l’offre.', d.deck ? `<button data-btn="deck" class="ghost">Piocher (Hedgehog)</button>` : '');
-    case 'swap': return q(P.sel.length ? 'Cliquez maintenant sur la carte de l’offre à prendre en échange.' : 'Swap-a-Petal Fair : cliquez sur une carte de votre main à échanger avec l’offre, ou passez.', `<button data-btn="no" class="ghost">Ne pas échanger</button>`);
-    case 'pass': return q('Great Gusty Day : choisissez la carte à passer à votre voisin de gauche.');
-    case 'extraPlay': return q(`${d.why} : jouez une carte de votre main dans votre ville.`, d.optional ? `<button data-btn="no" class="ghost">Ne pas jouer</button>` : '');
-    case 'tortoise': return q(P.sel.length ? 'Cliquez sur la carte où poser le Minikin.' : 'Tortoise : cliquez sur une carte d’où retirer un Minikin, ou passez.', `<button data-btn="no" class="ghost">Passer</button>`);
+    case 'keep': return q(t('pKeep', { n: P.sel.length }), `<button data-btn="ok" ${P.sel.length === 4 ? '' : 'disabled'}>${t('validate')}</button>`);
+    case 'play': return q(d.hidden ? t('pPlayHidden') : d.early ? t('pPlayEarly') : t('pPlay'));
+    case 'chipmunk': return q(t('pChip', { card: cardN(d.card) }), `<button data-btn="2">+2</button><button data-btn="0" class="ghost">${t('noneBtn')}</button><button data-btn="-2" class="ghost">−2</button>`);
+    case 'placeMinikin': return q(t('pPlace', { n: d.left }), B('auto', 'autoBtn', 1));
+    case 'bonus': return q(t('pBonus'));
+    case 'discard': return q(t('pDiscard', { why: whyT(d.why), n: d.n, s: P.sel.length }), `<button data-btn="ok" ${P.sel.length === d.n ? '' : 'disabled'}>${t('validate')}</button>`);
+    case 'take': return q(t('pTake'), d.deck ? B('deck', 'deckBtn', 1) : '');
+    case 'swap': return q(P.sel.length ? t('pSwap1') : t('pSwap0'), B('no', 'noSwap', 1));
+    case 'pass': return q(t('pPass'));
+    case 'extraPlay': return q(t('pExtra', { why: whyT(d.why) }), d.optional ? B('no', 'noPlay', 1) : '');
+    case 'tortoise': return q(P.sel.length ? t('pTort1') : t('pTort0'), B('no', 'skip', 1));
   }
   return '';
 }
@@ -331,19 +371,74 @@ function act(where, i) {
 // ---------- fenêtres ----------
 function bonusModal() {
   if (!V) return;
-  $('modal').innerHTML = `<div class="modal"><div class="box"><h2>Choisissez un jeton Bonus</h2><div class="tgrid">${V.bonusSupply.map((id, i) => `<button data-btn="tok" data-tok="${i}">${tokHtml(id).replace('class="tok"', 'class="tok" style="background:none;padding:0"')}</button>`).join('')}</div></div></div>`;
+  $('modal').innerHTML = `<div class="modal"><div class="box"><h2>${t('chooseTok')}</h2><div class="tgrid">${V.bonusSupply.map((id, i) => `<button data-btn="tok" data-tok="${i}">${tokHtml(id).replace('class="tok"', 'class="tok" style="background:none;padding:0"')}</button>`).join('')}</div></div></div>`;
 }
 function endModal() {
   if (!V || !V.final) return;
   const rows = V.final.map((f, i) => `<tr class="${i === 0 ? 'win' : ''}"><td><span class="dot" style="background:${f.color}"></span> ${esc(f.name)}</td><td>${f.markers}</td><td>${f.tokens}</td><td>${f.cards}</td><td>${f.cockades} <small>(${f.nck})</small></td><td>${f.pending}</td><td><b>${f.total}</b></td></tr>`).join('');
   const meWon = V.final[0].id === ME;
-  $('modal').innerHTML = `<div class="modal"><div class="box"><h2>${meWon ? 'Bravo, vous gagnez !' : `${esc(V.final[0].name)} gagne la partie`}</h2>
-    <table class="sc"><tr><th>Joueur</th><th>Récompenses</th><th>Jetons</th><th>Bâtiments</th><th>Cocardes</th><th>Minikins libres</th><th>Total</th></tr>${rows}</table>
-    <p style="color:var(--soft);font-size:14px">Égalité : le joueur avec le plus de Minikins non placés l’emporte.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${mode === 'solo' ? '<button id="again">Rejouer</button>' : '<button id="again">Retour au menu</button>'}<button class="ghost" id="close">Voir la table</button></div></div></div>`;
+  $('modal').innerHTML = `<div class="modal"><div class="box"><h2>${meWon ? t('youWin') : esc(t('wins', { p: V.final[0].name }))}</h2>
+    <table class="sc"><tr><th>${t('thPlayer')}</th><th>${t('thRewards')}</th><th>${t('thTokens')}</th><th>${t('thBuild')}</th><th>${t('thCk')}</th><th>${t('thFree')}</th><th>${t('thTotal')}</th></tr>${rows}</table>
+    <p style="color:var(--soft);font-size:14px">${t('tieNote')}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button id="again">${mode === 'solo' ? t('again') : t('backMenu')}</button><button class="ghost" id="close">${t('seeTable')}</button></div></div></div>`;
   $('again').onclick = () => { $('modal').innerHTML = ''; if (mode === 'solo') startSolo(); else backToMenu(); };
   $('close').onclick = () => { $('modal').innerHTML = ''; };
 }
+
+// ---------- statistiques (simulations entre IA) ----------
+let SN = 3, SG = 200, SRES = null, SSORT = 'edge', SFILT = 'all', worker = null;
+function openStats() { $('swild').checked = $('xwild').checked; $('sfest').checked = $('xfest').checked; SN = nPlayers; show('stats'); drawStatCtl(); drawStats(); }
+function drawStatCtl() {
+  $('snseg').innerHTML = [2, 3, 4, 5].map(n => `<button type="button" aria-pressed="${n === SN}" data-sn="${n}">${n}</button>`).join('');
+  $('sgseg').innerHTML = [100, 200, 500, 1000].map(n => `<button type="button" aria-pressed="${n === SG}" data-sg="${n}">${n}</button>`).join('');
+}
+$('snseg').addEventListener('click', e => { const b = e.target.closest('[data-sn]'); if (b) { SN = +b.dataset.sn; drawStatCtl(); } });
+$('sgseg').addEventListener('click', e => { const b = e.target.closest('[data-sg]'); if (b) { SG = +b.dataset.sg; drawStatCtl(); } });
+$('statsBack').addEventListener('click', () => { if (worker) { worker.terminate(); worker = null; } show('setup'); });
+$('srun').addEventListener('click', () => {
+  if (worker) worker.terminate();
+  try { worker = new Worker('sim-worker.js?v=5'); } catch (e) { $('sprog').textContent = e.message; return; }
+  $('srun').disabled = true; $('sbar').firstElementChild.style.width = '0'; $('sprog').textContent = t('running', { p: 0 });
+  worker.onmessage = (e) => {
+    const d = e.data;
+    if (d.progress !== undefined) { $('sbar').firstElementChild.style.width = (d.progress * 100) + '%'; $('sprog').textContent = t('running', { p: Math.round(d.progress * 100) }); }
+    if (d.done) { SRES = d; worker.terminate(); worker = null; $('srun').disabled = false; $('sprog').textContent = ''; drawStats(); }
+  };
+  worker.onerror = (e) => { $('sprog').textContent = 'Erreur : ' + e.message; $('srun').disabled = false; };
+  worker.postMessage({ n: SN, games: SG, fest: $('sfest').checked, wild: $('swild').checked });
+});
+document.addEventListener('click', e => {
+  const th = e.target.closest('[data-sort]'); if (th) { SSORT = th.dataset.sort; drawStats(); return; }
+  const f = e.target.closest('[data-filt]'); if (f) { SFILT = f.dataset.filt; drawStats(); }
+});
+const pct = (x) => (x * 100).toFixed(0) + ' %';
+function drawStats() {
+  const box = $('sres');
+  if (!SRES) { box.innerHTML = `<p style="color:var(--soft);margin-top:16px">${t('none')}</p>`; return; }
+  const r = SRES, n = r.n, base = 1 / n, minG = Math.max(8, r.games * n * 0.02);
+  const rows = Object.entries(r.card).map(([id, s]) => ({ id, c: CARD[id], games: s.games, win: s.wins / s.games, edge: (s.wins / s.games) / base - 1, owner: s.total / s.games, vp: s.vp / s.games, act: s.scoringGames ? s.active / s.scoringGames : null }))
+    .filter(x => x.c && (SFILT === 'all' || (SFILT === 'pets' ? x.c.pet : !x.c.pet && x.c.color === SFILT)));
+  const key = { edge: x => x.edge, games: x => x.games, win: x => x.win, owner: x => x.owner, vp: x => x.vp, act: x => x.act ?? -1, name: x => -(x.c.value) }[SSORT] || (x => x.edge);
+  rows.sort((a, b) => key(b) - key(a));
+  const edgeCell = (e) => `<span class="edge ${e >= 0 ? 'pos' : 'neg'}">${e >= 0 ? '+' : ''}${Math.round(e * 100)} %</span>`;
+  const th = (k, label) => `<th data-sort="${k}">${label}${SSORT === k ? ' ▾' : ''}</th>`;
+  const filt = ['all', 'pink', 'green', 'blue'].concat(r.card.wp4 || r.card.wb1 ? ['pets'] : []).map(f => `<button type="button" data-filt="${f}" aria-pressed="${f === SFILT}">${f === 'all' ? t('fAll') : f === 'pets' ? t('fPets') : LD().color[f]}</button>`).join('');
+  const festRows = Object.entries(r.fest || {}).map(([k, s]) => ({ f: D.FESTIVALS[k - 1], avg: s.total / s.games, spread: s.vp / s.games, games: s.games })).sort((a, b) => b.avg - a.avg);
+  const tokRows = Object.entries(r.tok || {}).map(([id, s]) => ({ id, games: s.games, edge: (s.wins / s.games) / base - 1, owner: s.total / s.games })).sort((a, b) => b.edge - a.edge);
+  box.innerHTML = `
+    <div class="kpis"><div class="kpi"><b>${r.games - r.errors}</b><span>${t('sGames')}</span></div><div class="kpi"><b>${r.avg.win.toFixed(1)}</b><span>${t('avgWin')}</span></div><div class="kpi"><b>${r.avg.all.toFixed(1)}</b><span>${t('avgAll')}</span></div></div>
+    <p style="margin:0 0 4px">${t('split', { a: r.avg.markers.toFixed(1), b: r.avg.tokens.toFixed(1), c: r.avg.cards.toFixed(1), d: r.avg.ck.toFixed(1) })}</p>
+    <p style="margin:0 0 10px;color:var(--soft)">${t('baseline', { n, p: Math.round(base * 100) })} ${t('note')}</p>
+    <div class="zone"><div class="filters">${filt}</div><div class="scroll"><table class="stab">
+      <tr>${th('name', t('cCard'))}${th('edge', t('cEdge'))}${th('win', t('cWin'))}${th('games', t('cPlayed'))}${th('owner', t('cOwner'))}${th('vp', t('cVp'))}${th('act', t('cAct'))}</tr>
+      ${rows.map(x => `<tr class="${x.games < minG ? 'low' : ''}" title="${x.games < minG ? t('low') : ''}"><td><span class="cn"><img src="img/${x.id}.jpg" alt="" data-zoom="img/${x.id}.jpg">${esc(cardN(x.id))}</span></td><td>${edgeCell(x.edge)}</td><td>${pct(x.win)}</td><td>${x.games}</td><td>${x.owner.toFixed(1)}</td><td>${x.vp.toFixed(1)}</td><td>${x.act === null ? '—' : pct(x.act)}</td></tr>`).join('')}
+    </table></div></div>
+    ${festRows.length ? `<div class="zone" style="margin-top:14px"><h3>${t('festT')}</h3><div class="scroll"><table class="stab"><tr><th>${t('festT')}</th><th>${t('festAvg')}</th><th>${t('festSpread')}</th><th>${t('sGames')}</th></tr>
+      ${festRows.map(x => `<tr><td><span class="cn"><img src="img/f${x.f.n}.jpg" alt="" data-zoom="img/f${x.f.n}.jpg" style="width:40px">${esc(x.f.name)}</span></td><td>${x.avg.toFixed(1)}</td><td>${x.spread.toFixed(1)}</td><td>${x.games}</td></tr>`).join('')}</table></div></div>` : ''}
+    <div class="zone" style="margin-top:14px"><h3>${t('tokT')}</h3><div class="scroll"><table class="stab"><tr><th>${t('tokT')}</th><th>${t('cEdge')}</th><th>${t('cPlayed')}</th><th>${t('cOwner')}</th></tr>
+      ${tokRows.map(x => `<tr><td>${tokHtml(x.id)}</td><td>${edgeCell(x.edge)}</td><td>${x.games}</td><td>${x.owner.toFixed(1)}</td></tr>`).join('')}</table></div></div>`;
+}
+
 window.MKUI = { get G() { return G; }, get V() { return V; }, get P() { return P; }, get mode() { return mode; }, answer, startSolo };
 
 // ---------- zoom ----------
