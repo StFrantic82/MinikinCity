@@ -166,6 +166,21 @@ input[type=text]{font:16px Nunito;padding:10px 12px;border-radius:12px;border:2p
 #soloBox,#onlineBox{padding:12px 18px 0}#onlineBox input{border-radius:999px}
 .home .homelinks{margin:14px 18px 18px}
 @media(max-width:480px){.hrow{flex-direction:column;align-items:stretch;border-radius:20px}.exts{grid-template-columns:1fr}.namebox{max-width:none}}
+.fpop{position:fixed;inset:0;z-index:55;display:grid;place-items:center;padding:16px;background:rgba(40,20,15,.35);animation:fpfade .25s ease-out}
+.fpop .fcard{position:relative;width:min(560px,100%);border-radius:28px;padding:22px 22px 18px;color:#3a2622;box-shadow:0 24px 60px rgba(0,0,0,.35);border:4px solid #fff;animation:fppop .4s cubic-bezier(.2,1.4,.4,1)}
+.fpop .season{font:400 13px Yum,Fredoka,sans-serif;text-transform:uppercase;letter-spacing:.6px;opacity:.75}
+.fpop .frow{display:grid;grid-template-columns:120px minmax(0,1fr);gap:14px;align-items:end;margin-top:6px}
+.fpop .pawn{width:110px;filter:drop-shadow(0 8px 8px rgba(0,0,0,.25));animation:bob 2.6s ease-in-out infinite}
+.fpop .bubble{position:relative;background:#fff;border-radius:22px;padding:14px 16px;box-shadow:0 6px 0 rgba(0,0,0,.08)}
+.fpop .bubble::before{content:'';position:absolute;left:-14px;bottom:26px;border:10px solid transparent;border-right:16px solid #fff;border-left:0}
+.fpop h2{font:400 clamp(22px,4vw,30px)/1.05 Yum,Fredoka,sans-serif;text-transform:uppercase;margin:0 0 4px;color:#3a2622}
+.fpop .ftag{font-style:italic;font-size:14px;color:#7a645c;margin:0 0 10px}
+.fpop .frule{font-size:16px;line-height:1.4;margin:0;font-weight:600}
+.fpop .fimg{position:absolute;right:-18px;top:-46px;width:150px;filter:drop-shadow(0 10px 12px rgba(0,0,0,.3));transform:rotate(6deg)}
+.fpop .fgo{display:flex;justify-content:flex-end;margin-top:14px}.fpop .fgo button{border-radius:999px;font:400 16px Yum,Fredoka,sans-serif;text-transform:uppercase;letter-spacing:.5px;padding:10px 22px;background:#3a2622;color:#fff;box-shadow:0 4px 0 #1f1210}
+@keyframes fppop{from{transform:scale(.6) rotate(-4deg);opacity:0}to{transform:none;opacity:1}}@keyframes fpfade{from{opacity:0}}
+@media(max-width:520px){.fpop .frow{grid-template-columns:70px minmax(0,1fr)}.fpop .pawn{width:70px}.fpop .fimg{width:100px;top:-36px;right:-8px}}
+@media (prefers-reduced-motion:reduce){.fpop .fcard,.fpop .pawn{animation:none}}
 .homelinks{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-top:16px;padding-top:14px;border-top:2px dashed #efe2d3}
 .homelinks a{color:#3a2622;font-weight:700;margin-right:12px}.ruleslbl{color:#7a645c;font-size:14px}
 .coach{position:fixed;right:18px;bottom:18px;width:min(380px,calc(100vw - 36px));background:#3a2622;color:#fff;border-radius:18px;padding:14px 16px;z-index:60;box-shadow:0 14px 40px rgba(0,0,0,.35);font-size:15px;line-height:1.4}
@@ -264,11 +279,12 @@ table.sc tr.win td{font-weight:800;background:light-dark(#fff3c8,#3b3218)}
 <div id="zoom"><img alt=""></div>
 <div id="modal"></div>
 <div id="coach"></div>
-<script src="config.js?v=18"></script>
-<script src="i18n.js?v=18"></script>
-<script src="data.js?v=18"></script>
-<script src="net.js?v=18"></script>
-<script src="engine.js?v=18"></script>
-<script src="ui.js?v=18"></script>
+<div id="festpop"></div>
+<script src="config.js?v=19"></script>
+<script src="i18n.js?v=19"></script>
+<script src="data.js?v=19"></script>
+<script src="net.js?v=19"></script>
+<script src="engine.js?v=19"></script>
+<script src="ui.js?v=19"></script>
 </body>
 </html>

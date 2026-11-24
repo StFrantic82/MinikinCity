@@ -120,6 +120,7 @@ function runGame(players, s) {
 }
 async function onEvent(g, ev) {
   if (g !== G) throw new Error('partie abandonnée');
+  if (ev.msg && (ev.msg[0] === 'fest' || ev.msg[0] === 'newyear')) { refresh(); await festPopup(ev.msg[1].fest, ev.msg[0] === 'newyear', true); }
   if (TUTO && ev.msg) { const k = ev.msg[0]; if (k === 'ranking') tutoOn('rank'); else if (k === 'endRank') tutoOn('endRank'); else if (k === 'over') tutoOn('over'); }
   refresh();
   const mine = ev.who === ME;
@@ -235,7 +236,7 @@ function takeOver(seat) {
 }
 function attachClient() {
   show('game');
-  unsub.push(NET.on(`rooms/${room}/views/${ME}`, (raw) => { if (!raw) return; V = JSON.parse(raw); if (P && P.kind === 'bonus' && !$('modal').innerHTML) bonusModal(); render(); if (V.final && !$('modal').innerHTML) endModal(); }));
+  unsub.push(NET.on(`rooms/${room}/views/${ME}`, (raw) => { if (!raw) return; V = JSON.parse(raw); { const key = V.fest ? V.round + ':' + V.fest.n : null; if (key && key !== lastFestSeen) { lastFestSeen = key; festPopup(V.fest.n, V.round >= 8, false); } } if (P && P.kind === 'bonus' && !$('modal').innerHTML) bonusModal(); render(); if (V.final && !$('modal').innerHTML) endModal(); }));
   unsub.push(NET.on(`rooms/${room}/prompts/${ME}`, (raw) => {
     if (!raw) { if (P) { P = null; $('modal').innerHTML = ''; render(); } return; }
     const pr = JSON.parse(raw); if (P && P.id === pr.id) return;
@@ -466,7 +467,7 @@ $('sclear').addEventListener('click', () => { if (SSRC === 'ai') { const all = l
 $('statsBack').addEventListener('click', () => { if (worker) { worker.terminate(); worker = null; } show('setup'); });
 $('srun').addEventListener('click', () => {
   if (worker) worker.terminate();
-  try { worker = new Worker('sim-worker.js?v=18'); } catch (e) { $('sprog').textContent = e.message; return; }
+  try { worker = new Worker('sim-worker.js?v=19'); } catch (e) { $('sprog').textContent = e.message; return; }
   $('srun').disabled = true; $('sbar').firstElementChild.style.width = '0'; $('sprog').textContent = t('running', { p: 0 });
   worker.onmessage = (e) => {
     const d = e.data;
@@ -539,6 +540,30 @@ function coachNext() {
 function endTuto() { TUTO = null; document.querySelectorAll('.hl').forEach(e => e.classList.remove('hl')); const b = $('coach'); if (b) b.innerHTML = ''; }
 $('tuto').addEventListener('click', startTutorial);
 $('statsBtn').addEventListener('click', openStats);
+
+
+// ---------- bulle d’annonce des Fêtes ----------
+const SEASON_BG = { spring: 'linear-gradient(160deg,#e6f3c4,#b9df7a)', summer: 'linear-gradient(160deg,#fbf1a8,#f4d64e)', autumn: 'linear-gradient(160deg,#fbd9b4,#f2a159)', winter: 'linear-gradient(160deg,#d6ebf8,#86c0e6)', newyear: 'linear-gradient(120deg,#f6b9cf,#fbf1a8,#cdeadb,#b9d8f2,#d9c8f2)' };
+let festShown = 0, festClose = null;
+function festPopup(n, ny, wait) {
+  if (window.MK_FAST) return Promise.resolve();
+  const f = D.FESTIVALS[n - 1], U = I18N.FEST_UI[LANG] || I18N.FEST_UI.fr, tag = (I18N.FTAG[LANG] || I18N.FTAG.en)[n - 1];
+  const pawn = ['pink', 'green', 'white', 'acorn'][festShown++ % 4];
+  $('festpop').innerHTML = `<div class="fpop" role="dialog" aria-label="${esc(f.name)}"><div class="fcard" style="background:${SEASON_BG[f.season]}">
+    <img class="fimg" src="img/fest_${n}.webp" alt="">
+    <div class="season">${ny ? U.newYearParty : U.festOf} · ${U.season[f.season]}</div>
+    <div class="frow"><img class="pawn" src="img/pawn_${pawn}.png" alt="">
+      <div class="bubble"><h2>${esc(f.name)}</h2><p class="ftag">${esc(tag)}</p><p class="frule">${esc(festText(n))}</p></div></div>
+    <div class="fgo"><button id="fgo">${U.go}</button></div></div></div>`;
+  return new Promise(res => {
+    const done = () => { clearTimeout(tm); $('festpop').innerHTML = ''; festClose = null; res(); };
+    festClose = done; $('fgo').onclick = done; $('fgo').focus();
+    $('festpop').firstElementChild.addEventListener('click', e => { if (e.target.classList.contains('fpop')) done(); });
+    const tm = setTimeout(done, wait ? 60000 : 20000);
+  });
+}
+document.addEventListener('keydown', e => { if (festClose && (e.key === 'Escape' || e.key === 'Enter')) { e.preventDefault(); festClose(); } });
+let lastFestSeen = null;
 
 window.MKUI = { get G() { return G; }, get V() { return V; }, get P() { return P; }, get mode() { return mode; }, answer, startSolo };
 

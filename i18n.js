@@ -294,5 +294,26 @@ const TUTO = {
     over: ['Fine della partita!', 'Il punteggio somma i PV delle ricompense, i segnalini, gli edifici pieni e le coccarde. Ora conosci le basi: tocca a te!', null],
   },
 };
-window.MK_I18N = { fr: FR, en: EN, it: IT, FEST, TUTO };
+// Phrases d’accroche des Fêtes (dans l’ordre des cartes 1 à 18)
+const FTAG = {
+  en: ['One giant’s junk is a Minikin’s treasure.', 'A tulip for your thimble? Deal!', 'Lost buttons, crumbs… and adventure!', 'First come, first served (worms optional).',
+    'Who’s dancing with whom? Nobody knows!', 'Hum the same tune, hum it louder!', 'Hold on to your leaf hats!', 'Two by two, hop on through!',
+    'The bigger the story, the better.', 'Fastest wings win the ribbon!', 'Slow and steady wins the cup.', 'Hooray for every sock without a pair!',
+    'Up is down, and down is up!', 'Wheee! Just follow the leader!', 'The smallest lanterns shine the brightest.', 'Far too snowy to go out today.',
+    'Quick, one last thing before midnight!', 'This year, I’ll travel light!'],
+  fr: ['Le bric-à-brac des géants, c’est le trésor des Minikins.', 'Une tulipe contre ton dé à coudre ? Marché conclu !', 'Des boutons perdus, des miettes… et de l’aventure !', 'Premier arrivé, premier servi (vers de terre en option).',
+    'Qui danse avec qui ? Personne ne le sait !', 'Même mélodie, et plus fort !', 'Tenez bien vos chapeaux-feuilles !', 'Deux par deux, on saute heureux !',
+    'Plus l’histoire est grande, mieux c’est.', 'Les ailes les plus rapides gagnent le ruban !', 'Rien ne sert de courir…', 'Hourra pour chaque chaussette sans sa paire !',
+    'Le haut est en bas, et le bas est en haut !', 'Youpiii ! Suivez le guide !', 'Les plus petites lanternes brillent le plus fort.', 'Bien trop de neige pour sortir aujourd’hui.',
+    'Vite, une dernière chose avant minuit !', 'Cette année, je voyage léger !'],
+  it: ['La cianfrusaglia dei giganti è il tesoro dei Minikin.', 'Un tulipano per il tuo ditale? Affare fatto!', 'Bottoni persi, briciole… e avventura!', 'Chi prima arriva meglio alloggia (lombrichi facoltativi).',
+    'Chi balla con chi? Nessuno lo sa!', 'Stessa melodia, ma più forte!', 'Tenete stretti i cappelli di foglia!', 'Due a due, si salta in su!',
+    'Più grande è la storia, meglio è.', 'Le ali più veloci vincono il nastro!', 'Chi va piano va sano e vince la coppa.', 'Evviva ogni calzino spaiato!',
+    'Il sopra è sotto e il sotto è sopra!', 'Wheee! Seguite il capofila!', 'Le lanterne più piccole brillano di più.', 'Troppa neve per uscire oggi.',
+    'Presto, un’ultima cosa prima di mezzanotte!', 'Quest’anno viaggio leggero!'],
+};
+const FEST_UI = { fr: { festOf: 'Fête du mois', newYearParty: 'Fête du Nouvel An', go: 'C’est parti !', season: { spring: 'Printemps', summer: 'Été', autumn: 'Automne', winter: 'Hiver', newyear: 'Nouvel An' } },
+  en: { festOf: 'This month’s festival', newYearParty: 'New Year party', go: 'Let’s go!', season: { spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter', newyear: 'New Year' } },
+  it: { festOf: 'Festa del mese', newYearParty: 'Festa di Capodanno', go: 'Si comincia!', season: { spring: 'Primavera', summer: 'Estate', autumn: 'Autunno', winter: 'Inverno', newyear: 'Capodanno' } } };
+window.MK_I18N = { fr: FR, en: EN, it: IT, FEST, TUTO, FTAG, FEST_UI };
 }
