@@ -252,7 +252,8 @@ class Game {
         city: p.city.map(sl => ({ id: sl.c.id, m: sl.m })), pending: p.pending, tokens: p.tokens.map(t => t.id), markerVp: p.markerVp,
         markers: p.markers, total: sc.total, nck: sc.nck, syms: b.s, wS: b.wS }; }),
       log: this.log.slice(-150).map(l => ({ k: l.k, a: l.a, kind: l.kind })),
-      final: this.final ? this.final.map(f => ({ id: f.p.id, name: f.p.name, color: f.p.color, markers: f.markers, tokens: f.tokens, cards: f.cards, cockades: f.cockades, nck: f.nck, pending: f.p.pending, total: f.total })) : null,
+      final: this.final ? this.final.map(f => ({ id: f.p.id, name: f.p.name, color: f.p.color, markers: f.markers, tokens: f.tokens, cards: f.cards, cockades: f.cockades, nck: f.nck, pending: f.p.pending, total: f.total, effs: f.effs })) : null,
+      fests: this.festOn ? this.festRow.map(f => f.n) : null, tokens9: this.players.map(p => p.tokens.map(t => t.id)),
     };
   }
 

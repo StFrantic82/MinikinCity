@@ -234,6 +234,15 @@ STATS.it.cum = 'cumulate (max {m}, le più vecchie vengono sostituite)'; STATS.i
 Object.assign(STATS.fr, { home: 'Accueil', tutorial: 'Tutoriel', rulesLbl: 'Règles :', rulesBase: 'Jeu de base' });
 Object.assign(STATS.en, { home: 'Home', tutorial: 'Tutorial', rulesLbl: 'Rules:', rulesBase: 'Base game' });
 Object.assign(STATS.it, { home: 'Home', tutorial: 'Tutorial', rulesLbl: 'Regole:', rulesBase: 'Gioco base' });
+Object.assign(STATS.fr, { srcAI: 'Simulations entre IA', srcHuman: 'Vos parties', yourWins: 'Vos victoires', yourScore: 'Votre score moyen', yourRank: 'Votre place moyenne',
+  noneHuman: 'Aucune partie enregistrée pour cette configuration. Vos parties (solo ou en ligne) sont enregistrées automatiquement dans ce navigateur à la fin de chaque partie.',
+  noteHuman: 'Ces chiffres portent sur vos parties terminées (hors tutoriel), enregistrées dans ce navigateur. « Effet sur la victoire » compare votre taux de victoire quand vous aviez la carte à la moyenne.' });
+Object.assign(STATS.en, { srcAI: 'AI simulations', srcHuman: 'Your games', yourWins: 'Your wins', yourScore: 'Your average score', yourRank: 'Your average place',
+  noneHuman: 'No game recorded for this setup. Your games (solo or online) are saved automatically in this browser at the end of each game.',
+  noteHuman: 'These figures cover your finished games (excluding the tutorial), saved in this browser. “Effect on winning” compares your win rate when you had the card with the average.' });
+Object.assign(STATS.it, { srcAI: 'Simulazioni tra IA', srcHuman: 'Le tue partite', yourWins: 'Le tue vittorie', yourScore: 'Il tuo punteggio medio', yourRank: 'Il tuo piazzamento medio',
+  noneHuman: 'Nessuna partita registrata per questa configurazione. Le tue partite (solo o online) vengono salvate automaticamente in questo browser alla fine di ogni partita.',
+  noteHuman: 'Questi numeri riguardano le tue partite concluse (escluso il tutorial), salvate in questo browser. “Effetto sulla vittoria” confronta la tua percentuale di vittorie quando avevi la carta con la media.' });
 Object.assign(FR, STATS.fr); Object.assign(EN, STATS.en); Object.assign(IT, STATS.it);
 const TUTO = {
   fr: {

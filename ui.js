@@ -280,7 +280,7 @@ function render() {
     if (V.festOn) { const fr = V.festRow[i]; const src = fr.shown ? `img/f${fr.n}.jpg` : `img/fb_${fr.season}.jpg`; fest = `<img class="fest" src="${src}" alt="${fr.shown ? esc(fr.name) : t('hiddenFest')}"${fr.shown ? ` data-zoom="${src}"` : ''}>`; }
     let mk = '';
     if (i < 8) for (const p of V.players) for (const m of p.markers) if (m.round === i) mk += `<span class="mk" style="top:${(rowStart(V.n) + m.pos * 0.1325) * 100}%;background:${p.color}" title="${esc(p.name)}"></span>`;
-    const tile = i === 8 ? `<img class="tile" src="img/end_${V.n}.jpg" alt="${t('endTile')}" data-zoom="img/end_${V.n}.jpg">` : '';
+    const tile = i === 8 ? `<img class="tile" src="img/end_${V.n}.png" alt="${t('endTile')}" data-zoom="img/end_${V.n}.png">` : '';
     y += `<div class="ycol ${i === V.round ? 'now' : ''}"><span class="n">${i < 8 ? i + 1 : t('endCol')}</span>${fest}<div class="rcard"><img src="img/${rc.img}.jpg" alt="${t('rewardCard')}" data-zoom="img/${rc.img}.jpg">${tile}${mk}</div></div>`;
   }
   $('year').innerHTML = y;
@@ -389,7 +389,28 @@ function bonusModal() {
   if (!V) return;
   $('modal').innerHTML = `<div class="modal"><div class="box"><h2>${t('chooseTok')}</h2><div class="tgrid">${V.bonusSupply.map((id, i) => `<button data-btn="tok" data-tok="${i}">${tokHtml(id).replace('class="tok"', 'class="tok" style="background:none;padding:0"')}</button>`).join('')}</div></div></div>`;
 }
+// ---------- parties jouées par des humains (enregistrées dans ce navigateur) ----------
+let recorded = null;
+function recordHuman() {
+  if (!V || !V.final || TUTO || recorded === V.final) return; recorded = V.final;
+  const me = V.players[ME], f = V.final.find(x => x.id === ME); if (!me || !f) return;
+  const winner = V.final[0].id === ME, card = {}, fest = {}, tok = {};
+  const vpById = {}; for (const ef of f.effs || []) vpById[ef.id] = (vpById[ef.id] || 0) + ef.vp;
+  for (const sl of me.city) { const c = CARD[sl.id]; if (!c) continue; const s = card[sl.id] = card[sl.id] || { games: 0, wins: 0, vp: 0, active: 0, scoringGames: 0, total: 0 };
+    s.games++; if (winner) s.wins++; s.total += f.total; s.vp += vpById[sl.id] || 0; if (c.type === 'S') { s.scoringGames++; if (sl.m >= c.spaces) s.active++; } }
+  for (const id of me.tokens) { const s = tok[id] = tok[id] || { games: 0, wins: 0, total: 0 }; s.games++; if (winner) s.wins++; s.total += f.total; }
+  const avgAll = V.final.reduce((a, x) => a + x.total, 0) / V.final.length;
+  if (V.fests) for (const n of V.fests) { const s = fest[n] = fest[n] || { games: 0, total: 0, vp: 0 }; s.games++; s.total += avgAll; s.vp += V.final[0].total - V.final[V.final.length - 1].total; }
+  const key = `${V.n}-${V.wildOn ? 1 : 0}-${V.festOn ? 1 : 0}`, all = loadHuman(); const list = all[key] || [];
+  list.push({ card, fest, tok, games: 1, n: V.n, wins: winner ? 1 : 0, score: f.total, rank: V.final.findIndex(x => x.id === ME) + 1,
+    avg: { win: V.final[0].total, all: avgAll, markers: f.markers, tokens: f.tokens, cards: f.cards, ck: f.cockades }, at: Date.now(), online: mode !== 'solo', level: mode === 'solo' ? LEVEL : null });
+  while (list.length > SMAX) list.shift();
+  all[key] = list; try { localStorage.setItem('mk-human', JSON.stringify(all)); } catch (err) {}
+}
+function loadHuman() { try { return JSON.parse(localStorage.getItem('mk-human') || '{}'); } catch (e) { return {}; } }
+
 function endModal() {
+  recordHuman();
   if (!V || !V.final) return;
   const rows = V.final.map((f, i) => `<tr class="${i === 0 ? 'win' : ''}"><td><span class="dot" style="background:${f.color}"></span> ${esc(f.name)}</td><td>${f.markers}</td><td>${f.tokens}</td><td>${f.cards}</td><td>${f.cockades} <small>(${f.nck})</small></td><td>${f.pending}</td><td><b>${f.total}</b></td></tr>`).join('');
   const meWon = V.final[0].id === ME;
@@ -402,7 +423,7 @@ function endModal() {
 }
 
 // ---------- statistiques (simulations entre IA) ----------
-let FSORT = 'avg', SN = 3, SG = 500, SRES = null, SSORT = 'edge', SFILT = 'all', worker = null;
+let SSRC = 'ai', FSORT = 'avg', SN = 3, SG = 500, SRES = null, SSORT = 'edge', SFILT = 'all', worker = null;
 // cumul des simulations par configuration (3 000 parties max, les plus anciennes sont retirées)
 const SMAX = 3000;
 const cfgKey = () => `${SN}-${$('swild').checked ? 1 : 0}-${$('sfest').checked ? 1 : 0}`;
@@ -428,20 +449,24 @@ function merge(list) {
   for (const f of Object.keys(list[0].avg)) avg[f] = list.reduce((a, b) => a + b.avg[f] * b.games, 0) / games;
   return { card: sum('card'), fest: sum('fest'), tok: sum('tok'), avg, games, errors: 0, n: list[0].n };
 }
-function refreshCum() { SRES = merge(loadBatches()[cfgKey()]); drawStats(); }
+function refreshCum() { const list = SSRC === 'ai' ? loadBatches()[cfgKey()] : loadHuman()[cfgKey()]; SRES = merge(list); if (SRES && SSRC === 'human') { SRES.human = { wins: list.reduce((a, b) => a + b.wins, 0), score: list.reduce((a, b) => a + b.score, 0) / list.length, rank: list.reduce((a, b) => a + b.rank, 0) / list.length }; } drawStatCtl(); drawStats(); }
 function openStats() { $('swild').checked = $('xwild').checked; $('sfest').checked = $('xfest').checked; SN = nPlayers; show('stats'); drawStatCtl(); refreshCum(); }
 function drawStatCtl() {
   $('snseg').innerHTML = [2, 3, 4, 5].map(n => `<button type="button" aria-pressed="${n === SN}" data-sn="${n}">${n}</button>`).join('');
+  $('ssrc').innerHTML = ['ai', 'human'].map(k => `<button type="button" aria-pressed="${k === SSRC}" data-src="${k}">${t(k === 'ai' ? 'srcAI' : 'srcHuman')}</button>`).join('');
+  $('simctl').style.display = SSRC === 'ai' ? '' : 'none';
+  $('srun').style.display = SSRC === 'ai' ? '' : 'none'; $('sbar').style.display = SSRC === 'ai' ? '' : 'none';
   $('sgseg').innerHTML = [100, 500, 1000, 3000].map(n => `<button type="button" aria-pressed="${n === SG}" data-sg="${n}">${n}</button>`).join('');
 }
 $('snseg').addEventListener('click', e => { const b = e.target.closest('[data-sn]'); if (b) { SN = +b.dataset.sn; drawStatCtl(); refreshCum(); } });
 $('sgseg').addEventListener('click', e => { const b = e.target.closest('[data-sg]'); if (b) { SG = +b.dataset.sg; drawStatCtl(); } });
+$('ssrc').addEventListener('click', e => { const b = e.target.closest('[data-src]'); if (b) { SSRC = b.dataset.src; refreshCum(); } });
 $('swild').addEventListener('change', refreshCum); $('sfest').addEventListener('change', refreshCum);
-$('sclear').addEventListener('click', () => { const all = loadBatches(); delete all[cfgKey()]; saveBatches(all); refreshCum(); });
+$('sclear').addEventListener('click', () => { if (SSRC === 'ai') { const all = loadBatches(); delete all[cfgKey()]; saveBatches(all); } else { const all = loadHuman(); delete all[cfgKey()]; try { localStorage.setItem('mk-human', JSON.stringify(all)); } catch (e) {} } refreshCum(); });
 $('statsBack').addEventListener('click', () => { if (worker) { worker.terminate(); worker = null; } show('setup'); });
 $('srun').addEventListener('click', () => {
   if (worker) worker.terminate();
-  try { worker = new Worker('sim-worker.js?v=12'); } catch (e) { $('sprog').textContent = e.message; return; }
+  try { worker = new Worker('sim-worker.js?v=14'); } catch (e) { $('sprog').textContent = e.message; return; }
   $('srun').disabled = true; $('sbar').firstElementChild.style.width = '0'; $('sprog').textContent = t('running', { p: 0 });
   worker.onmessage = (e) => {
     const d = e.data;
@@ -459,7 +484,7 @@ document.addEventListener('click', e => {
 const pct = (x) => (x * 100).toFixed(0) + ' %';
 function drawStats() {
   const box = $('sres');
-  if (!SRES) { box.innerHTML = `<p style="color:var(--soft);margin-top:16px">${t('none')}</p>`; return; }
+  if (!SRES) { box.innerHTML = `<p style="color:var(--soft);margin-top:16px">${t(SSRC === 'ai' ? 'none' : 'noneHuman')}</p>`; return; }
   const r = SRES, n = r.n, base = 1 / n, minG = Math.max(8, r.games * n * 0.02);
   const rows = Object.entries(r.card).filter(([id, s]) => s.games >= 0.5).map(([id, s]) => ({ id, c: CARD[id], games: Math.round(s.games), win: s.wins / s.games, edge: (s.wins / s.games) / base - 1, owner: s.total / s.games, vp: s.vp / s.games, act: s.scoringGames ? s.active / s.scoringGames : null }))
     .filter(x => x.c && (SFILT === 'all' || (SFILT === 'pets' ? x.c.pet : !x.c.pet && x.c.color === SFILT)));
@@ -472,9 +497,9 @@ function drawStats() {
   const fth = (k, label) => `<th data-fsort="${k}">${label}${FSORT === k ? ' ▾' : ''}</th>`;
   const tokRows = Object.entries(r.tok || {}).map(([id, s]) => ({ id, games: Math.round(s.games), edge: (s.wins / s.games) / base - 1, owner: s.total / s.games })).sort((a, b) => b.edge - a.edge);
   box.innerHTML = `
-    <div class="kpis"><div class="kpi"><b>${Math.round(r.games - r.errors)}</b><span>${t('sGames')} · ${t('cum', { m: SMAX.toLocaleString(LANG) })}</span></div><div class="kpi"><b>${r.avg.win.toFixed(1)}</b><span>${t('avgWin')}</span></div><div class="kpi"><b>${r.avg.all.toFixed(1)}</b><span>${t('avgAll')}</span></div></div>
+    <div class="kpis"><div class="kpi"><b>${Math.round(r.games - r.errors)}</b><span>${t('sGames')}${SSRC === 'ai' ? ' · ' + t('cum', { m: SMAX.toLocaleString(LANG) }) : ''}</span></div>${r.human ? `<div class="kpi"><b>${pct(r.human.wins / r.games)}</b><span>${t('yourWins')}</span></div><div class="kpi"><b>${r.human.score.toFixed(1)}</b><span>${t('yourScore')}</span></div><div class="kpi"><b>${r.human.rank.toFixed(1)}</b><span>${t('yourRank')}</span></div>` : ''}<div class="kpi"><b>${r.avg.win.toFixed(1)}</b><span>${t('avgWin')}</span></div><div class="kpi"><b>${r.avg.all.toFixed(1)}</b><span>${t('avgAll')}</span></div></div>
     <p style="margin:0 0 4px">${t('split', { a: r.avg.markers.toFixed(1), b: r.avg.tokens.toFixed(1), c: r.avg.cards.toFixed(1), d: r.avg.ck.toFixed(1) })}</p>
-    <p style="margin:0 0 10px;color:var(--soft)">${t('baseline', { n, p: Math.round(base * 100) })} ${t('note')}</p>
+    <p style="margin:0 0 10px;color:var(--soft)">${t('baseline', { n, p: Math.round(base * 100) })} ${SSRC === 'ai' ? t('note') : t('noteHuman')}</p>
     <div class="zone"><div class="filters">${filt}</div><div class="scroll"><table class="stab">
       <tr>${th('name', t('cCard'))}${th('edge', t('cEdge'))}${th('win', t('cWin'))}${th('games', t('cPlayed'))}${th('owner', t('cOwner'))}${th('vp', t('cVp'))}${th('act', t('cAct'))}</tr>
       ${rows.map(x => `<tr class="${x.games < minG ? 'low' : ''}" title="${x.games < minG ? t('low') : ''}"><td><span class="cn"><img src="img/${x.id}.jpg" alt="" data-zoom="img/${x.id}.jpg">${esc(cardN(x.id))}</span></td><td>${edgeCell(x.edge)}</td><td>${pct(x.win)}</td><td>${x.games}</td><td>${x.owner.toFixed(1)}</td><td>${x.vp.toFixed(1)}</td><td>${x.act === null ? '—' : pct(x.act)}</td></tr>`).join('')}
