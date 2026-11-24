@@ -1,5 +1,5 @@
 {
-const { Game, AI, cardName, COLOR_FR } = window.MK;
+const { Game, AI, aiFor, cardName, COLOR_FR } = window.MK;
 const D = window.MK_DATA;
 const NET = window.MKNet;
 const $ = (id) => document.getElementById(id);
@@ -47,23 +47,26 @@ document.addEventListener('click', e => {
 });
 
 // mode : 'solo' | 'host' | 'client'
-let mode = 'solo', G = null, V = null, P = null, ME = 0, nPlayers = 3, tab = 'solo';
+let mode = 'solo', G = null, V = null, P = null, ME = 0, nPlayers = 3, tab = 'solo', LEVEL = 'normal';
 let room = null, unsub = [], remote = {}, remoteSeats = new Set(), promptSeq = 0;
 
 // ---------- écran de lancement ----------
-try { const s = JSON.parse(localStorage.getItem('mk-setup') || '{}'); if (s.n) nPlayers = s.n; if (s.name) $('pname').value = s.name; $('xfest').checked = !!s.fest; $('xwild').checked = !!s.wild; } catch (e) {}
+try { const s = JSON.parse(localStorage.getItem('mk-setup') || '{}'); if (s.n) nPlayers = s.n; if (s.level) LEVEL = s.level; if (s.name) $('pname').value = s.name; $('xfest').checked = !!s.fest; $('xwild').checked = !!s.wild; } catch (e) {}
 function drawSeg() {
   $('nseg').innerHTML = [2, 3, 4, 5].map(n => `<button type="button" aria-pressed="${n === nPlayers}" data-n="${n}">${n}</button>`).join('');
   $('tabs').innerHTML = ['solo', 'online', 'stats'].map(tb => `<button type="button" aria-pressed="${tb === tab}" data-tab="${tb}">${tb === 'solo' ? t('tabSolo') : tb === 'online' ? t('tabOnline') : t('tabStats')}</button>`).join('');
   $('soloBox').style.display = tab === 'solo' ? '' : 'none';
   $('onlineBox').style.display = tab === 'online' ? '' : 'none';
   $('nhint').textContent = tab === 'solo' ? t('hintSolo') : t('hintOnline');
+  $('lvseg').innerHTML = ['easy', 'normal', 'hard'].map(l => `<button type="button" aria-pressed="${l === LEVEL}" data-lv="${l}">${t({ easy: 'lvEasy', normal: 'lvNormal', hard: 'lvHard' }[l])}</button>`).join('');
+  $('lvhint').textContent = LD().lvHint[LEVEL];
   $('netoff').style.display = NET ? 'none' : '';
   $('create').disabled = !NET; $('join').disabled = !NET;
 }
 applyStatic();
 if (!$('pname').value) $('pname').value = t('defaultName');
 drawSeg();
+$('lvseg').addEventListener('click', e => { const b = e.target.closest('[data-lv]'); if (b) { LEVEL = b.dataset.lv; drawSeg(); } });
 $('nseg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { nPlayers = +b.dataset.n; drawSeg(); } });
 $('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.tab === 'stats') { openStats(); return; } tab = b.dataset.tab; drawSeg(); });
 $('start').addEventListener('click', startSolo);
@@ -78,7 +81,7 @@ if (params.get('room')) { tab = 'online'; $('rcode').value = params.get('room').
 function settings() {
   const name = ($('pname').value || t('defaultName')).trim().slice(0, 16);
   const fest = $('xfest').checked, wild = $('xwild').checked;
-  try { localStorage.setItem('mk-setup', JSON.stringify({ n: nPlayers, name, fest, wild })); } catch (e) {}
+  try { localStorage.setItem('mk-setup', JSON.stringify({ n: nPlayers, name, fest, wild, level: LEVEL })); } catch (e) {}
   return { name, fest, wild, n: nPlayers };
 }
 function show(id) { for (const s of ['setup', 'lobby', 'game', 'stats']) $(s).style.display = s === id ? (s === 'game' || s === 'stats' ? 'block' : 'grid') : 'none'; }
@@ -94,7 +97,7 @@ function answer(v) {
 function startSolo() {
   const s = settings(); mode = 'solo'; ME = 0;
   const players = [{ name: s.name, human: true, color: COLORS[0], agent: human }];
-  for (let i = 1; i < s.n; i++) players.push({ name: AI_NAMES[i - 1], color: COLORS[i] });
+  for (let i = 1; i < s.n; i++) players.push({ name: AI_NAMES[i - 1], color: COLORS[i], agent: aiFor(LEVEL) });
   runGame(players, s);
 }
 function runGame(players, s) {
@@ -197,7 +200,7 @@ function remoteAgent(seat) {
 }
 function hostStart() {
   meta.status = 'playing'; NET.set(`rooms/${room}/meta`, JSON.stringify(meta));
-  const players = meta.seats.map((x, i) => ({ name: x.name, color: COLORS[i], human: x.kind !== 'ai', agent: x.kind === 'host' ? human : x.kind === 'remote' ? remoteAgent(i) : AI }));
+  const players = meta.seats.map((x, i) => ({ name: x.name, color: COLORS[i], human: x.kind !== 'ai', agent: x.kind === 'host' ? human : x.kind === 'remote' ? remoteAgent(i) : aiFor(LEVEL) }));
   meta.seats.forEach((x, i) => {
     if (x.kind !== 'remote') return;
     remote[i] = null; remoteSeats.add(i);
@@ -397,7 +400,7 @@ $('sgseg').addEventListener('click', e => { const b = e.target.closest('[data-sg
 $('statsBack').addEventListener('click', () => { if (worker) { worker.terminate(); worker = null; } show('setup'); });
 $('srun').addEventListener('click', () => {
   if (worker) worker.terminate();
-  try { worker = new Worker('sim-worker.js?v=5'); } catch (e) { $('sprog').textContent = e.message; return; }
+  try { worker = new Worker('sim-worker.js?v=6'); } catch (e) { $('sprog').textContent = e.message; return; }
   $('srun').disabled = true; $('sbar').firstElementChild.style.width = '0'; $('sprog').textContent = t('running', { p: 0 });
   worker.onmessage = (e) => {
     const d = e.data;

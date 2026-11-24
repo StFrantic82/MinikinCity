@@ -194,6 +194,44 @@ class Game {
   }
 
 
+  // copie de l’état (pour les simulations de l’IA Difficile)
+  clone() {
+    const g = Object.create(Game.prototype);
+    Object.assign(g, this);
+    g.r = rng(Math.floor(Math.random() * 1e9)); g.onEvent = async () => {}; g.log = []; g.rollout = true; g.final = null;
+    g.deck = this.deck.slice(); g.display = this.display.slice(); g.bonusSupply = this.bonusSupply.slice();
+    g.revealed = new Set(this.revealed); g.festRow = this.festRow && this.festRow.slice(); g.orderIds = this.orderIds && this.orderIds.slice();
+    g.players = this.players.map(p => Object.assign({}, p, { hand: p.hand.slice(), city: p.city.map(s => ({ c: s.c, m: s.m })), tokens: p.tokens.slice(), markers: p.markers.slice() }));
+    const map = new Map(); g.plays = this.plays.map(pl => { const c = Object.assign({}, pl); map.set(pl, c); return c; });
+    g.chosen = (this.chosen || []).map(pl => map.get(pl) || Object.assign({}, pl));
+    g.ranking = []; g.current = null;
+    return g;
+  }
+  // redistribue au hasard ce que le joueur seat ne peut pas voir (mains adverses, pioche, fêtes cachées)
+  determinize(seat) {
+    const pool = this.deck.slice(); const sizes = [];
+    for (const p of this.players) if (p.id !== seat) { sizes.push([p, p.hand.length]); pool.push(...p.hand); }
+    shuffle(pool, this.r);
+    for (const [p, k] of sizes) p.hand = pool.splice(0, k);
+    this.deck = pool;
+    if (this.festOn) {
+      const used = new Set(this.festRow.filter((f, i) => this.revealed.has(i)).map(f => f.n));
+      for (let i = 0; i < 9; i++) if (!this.revealed.has(i)) {
+        const opts = D.FESTIVALS.filter(f => f.season === this.festRow[i].season && !used.has(f.n));
+        const f = opts[Math.floor(this.r() * opts.length)]; this.festRow[i] = f; used.add(f.n);
+      }
+    }
+  }
+  // termine la partie à partir d’un choix de carte pour le joueur courant
+  async rolloutFrom(seat, forced) {
+    const oi = this.orderIds.indexOf(seat);
+    await this.playPhase(oi, forced);
+    await this.finishRound();
+    for (this.round = this.round + 1; this.round < 8; this.round++) await this.playRound();
+    this.round = 8; await this.endgame();
+    return this.players.map(p => Object.assign({ id: p.id, pending: p.pending }, this.score(p)));
+  }
+
   // vue sérialisable de la table, du point de vue d’un siège (mains adverses cachées)
   view(seat) {
     const rk = new Map(this.ranking.map((pl, i) => [pl, i]));
@@ -255,15 +293,21 @@ class Game {
     // offre
     this.display = [];
     if (!this.fest(16)) { const k = this.n + 1 + (this.fest(1) ? 2 : 0); for (let i = 0; i < k; i++) { const c = this.draw(); if (c) this.display.push(c); } }
-    // jouer
     this.phase = 'play';
-    const order = this.turnOrder();
+    this.orderIds = this.turnOrder().map(p => p.id);
+    this.chosen = [];
+    await this.playPhase(0, null);
+    await this.finishRound();
+  }
+  // tour de jeu à partir du joueur n° start de l’ordre (forced = choix imposé pour ce joueur, utilisé par les simulations)
+  async playPhase(start, forced) {
     const lights = this.fest(5);
-    const chosen = [];
-    for (const p of order) {
+    const chosen = this.chosen;
+    for (let oi = start; oi < this.orderIds.length; oi++) {
+      const p = this.players[this.orderIds[oi]];
       this.current = p;
       const opts = { early: !!this.fest(4) && this.display.length > 0, hidden: !!lights };
-      let ch = await this.ask(p, 'play', opts);
+      let ch = (oi === start && forced) ? forced : await this.ask(p, 'play', opts);
       if (!ch || (ch.src === 'display' && !opts.early)) ch = { src: 'hand', i: 0 };
       let card;
       if (ch.src === 'display' && this.display[ch.i]) { card = this.display.splice(ch.i, 1)[0]; p.skipTake = true; }
@@ -278,6 +322,9 @@ class Game {
         if (this.fest(9) && card.value >= 11 && card.value <= 20) await this.drawDiscard(p, 1, 'Tall Tales Night');
       } else await this.emit(['faceDown', { p: p.name }], 'play', p.id);
     }
+  }
+  async finishRound() {
+    const lights = this.fest(5), chosen = this.chosen, rc = this.rewardRow[this.round];
     this.current = null;
     if (lights) {
       for (const pl of chosen) pl.hidden = false;
@@ -376,37 +423,46 @@ class Game {
 }
 
 // ---------- IA ----------
-const RV = (rw) => !rw ? 0 : (rw.m || 0) * 1.3 + (rw.vp || 0) + (rw.ck || 0) * 2.6 + (rw.bonus || 0) * 3 + (rw.dd || 0) * 0.8 + (rw.play ? 3 : 0);
-const AI = {
+// Poids de l’IA (ajustables par entraînement)
+const DEFAULT_W = { sym: 0.9, symW: 1.3, ck: 2.6, condPow: 2, perGrow: 0.4, mpr: 1.5, fillBase: 0.3, instM: 1.4, instB: 3,
+  rvM: 1.3, rvVp: 1, rvCk: 2.6, rvB: 3, rvDd: 0.8, rvPlay: 3, rankOff: 4, rankScale: 38, colB: 22,
+  hold: 0.3, keepVal: 0.12, takeVal: 0.06, early: 2.5, swapT: 1.5, deckT: 3.5,
+  tokVp: 2, tokCk: 2.6, tokM: 1.3, tokW: 1.6, tokSym: 1.4, pendFill: 0, petK: 1 };
+function makeAI(W0) {
+const W = Object.assign({}, DEFAULT_W, W0 || {});
+const RV = (rw) => !rw ? 0 : (rw.m || 0) * W.rvM + (rw.vp || 0) * W.rvVp + (rw.ck || 0) * W.rvCk + (rw.bonus || 0) * W.rvB + (rw.dd || 0) * W.rvDd + (rw.play ? W.rvPlay : 0);
+return {
+  W,
   bestIndex(arr) { let b = 0; arr.forEach((v, i) => { if (v > arr[b]) b = i; }); return b; },
   cityValue(g, p, card) {
-    let v = card.sym.reduce((a, s) => a + (s === 'W' ? 1.3 : 0.9), 0);
+    let v = card.sym.reduce((a, s) => a + (s === 'W' ? W.symW : W.sym), 0);
     const left = g.roundsLeft();
     const fake = { c: card, m: card.spaces };
     p.city.push(fake);
     try {
       const xs = g.ctxs(p); const x = xs[0]; x.ck = p.markerCk + 1;
       if (card.type === 'S' && card.eff) {
-        let gv = 0; for (const y of xs) { y.ck = x.ck; const e = g.evalEff(card.eff, y); gv = Math.max(gv, (e.vp || 0) + (e.ck || 0) * 2.6); }
-        if (!gv && card.eff.k === 'if') { // proximité de la condition
+        let gv = 0; for (const y of xs) { y.ck = x.ck; const e = g.evalEff(card.eff, y); gv = Math.max(gv, (e.vp || 0) + (e.ck || 0) * W.ck); }
+        if (!gv && card.eff.k === 'if') {
           let ratio = 1; for (const k in card.eff.need) ratio = Math.min(ratio, g.count(k, x) / card.eff.need[k]);
-          gv = ((card.eff.gain.vp || 0) + (card.eff.gain.ck || 0) * 2.6) * Math.pow(ratio, 2) * Math.min(1, left / 4);
-        } else if (card.eff.k === 'per') gv += Math.min(left, 3) * ((card.eff.gain.vp || 0) * 0.4);
+          gv = ((card.eff.gain.vp || 0) + (card.eff.gain.ck || 0) * W.ck) * Math.pow(ratio, W.condPow) * Math.min(1, left / 4);
+        } else if (card.eff.k === 'per') gv += Math.min(left, 3) * ((card.eff.gain.vp || 0) * W.perGrow);
         let free = 0; p.city.forEach(s => { if (s !== fake) free += Math.max(0, s.c.spaces - s.m); });
-        const pot = p.pending + left * 1.5 - free;
+        const pot = p.pending + left * W.mpr - free;
         const ratio = card.spaces ? Math.max(0, Math.min(1, pot / card.spaces)) : 1;
-        v += gv * (0.3 + 0.7 * ratio);
+        v += gv * (W.fillBase + (1 - W.fillBase) * ratio);
+        if (card.spaces) v += Math.min(card.spaces, p.pending) * W.pendFill;
       } else if (card.type === 'I' && card.eff) {
-        let gv = 0; for (const y of xs) { y.ck = x.ck; const e = g.evalEff(card.eff, y); gv = Math.max(gv, (e.m || 0) * 1.4 + (e.bonus || 0) * 3); }
+        let gv = 0; for (const y of xs) { y.ck = x.ck; const e = g.evalEff(card.eff, y); gv = Math.max(gv, (e.m || 0) * W.instM + (e.bonus || 0) * W.instB); }
         v += gv;
       } else if (card.pet) {
-        v += ({ chipmunk: 2.5, bluejay: 3, hedgehog: 1.2, dragonfly: p.markerCk >= 3 ? 4 : 1.5, snake: 2, snail: left * 0.5, tortoise: 0.8,
-          mole: 3, squirrel: left * 1.3, duck: 2.2, magpie: left * 0.5, raccoon: p.pending * 0.8 + 1, firefly: 4 })[card.pet] || 0;
+        v += W.petK * (({ chipmunk: 2.5, bluejay: 3, hedgehog: 1.2, dragonfly: p.markerCk >= 3 ? 4 : 1.5, snake: 2, snail: left * 0.5, tortoise: 0.8,
+          mole: 3, squirrel: left * 1.3, duck: 2.2, magpie: left * 0.5, raccoon: p.pending * 0.8 + 1, firefly: 4 })[card.pet] || 0);
       }
     } finally { p.city.pop(); }
     return v;
   },
-  holdValue(g, card) { const ec = g.rewardRow[8].color; return (ec === null || card.color === ec) ? card.value * 0.3 : 0; },
+  holdValue(g, card) { const ec = g.rewardRow[8].color; return (ec === null || card.color === ec) ? card.value * W.hold : 0; },
   strength(g, p, card, mod = 0) {
     if (card.id === 'x21') return 100;
     let v = card.value + mod;
@@ -414,7 +470,7 @@ const AI = {
     if (card.type === 'I' && g.has(p, 'snake')) v += 3;
     if (g.fest(11)) v = 21 - v;
     let colBest = g.best && card.color === g.best; if (g.fest(13) && g.best) colBest = !colBest;
-    let s = v + (colBest ? 22 : 0);
+    let s = v + (colBest ? W.colB : 0);
     if (g.fest(8)) s += card.value % 2 === 0 ? 45 : 0; if (g.fest(12)) s += card.value % 2 === 1 ? 45 : 0;
     return s;
   },
@@ -424,23 +480,22 @@ const AI = {
     const known = g.plays.filter(pl => !pl.hidden).map(pl => this.strength(g, g.players[pl.pid], pl.card, pl.mod));
     const beaten = known.filter(k => k >= s).length;
     const remaining = g.n - 1 - g.plays.length;
-    const pBeat = Math.max(0.05, Math.min(0.95, 1 - (s - 4) / 38));
+    const pBeat = Math.max(0.05, Math.min(0.95, 1 - (s - W.rankOff) / W.rankScale));
     let exp = 0;
     for (let pos = 0; pos < g.n; pos++) {
       const k = pos - beaten; if (k < 0 || k > remaining) continue;
-      const comb = (n, r) => { let c = 1; for (let i = 0; i < r; i++) c = c * (n - i) / (i + 1); return c; };
-      const pr = comb(remaining, k) * Math.pow(pBeat, k) * Math.pow(1 - pBeat, remaining - k);
-      exp += pr * RV(rows[pos]);
+      let c = 1; for (let i = 0; i < k; i++) c = c * (remaining - i) / (i + 1);
+      exp += c * Math.pow(pBeat, k) * Math.pow(1 - pBeat, remaining - k) * RV(rows[pos]);
     }
     return exp;
   },
   choose(kind, d, g, p) {
     switch (kind) {
-      case 'keep': { const sc = p.hand.map((c, i) => [this.cityValue(g, p, c) + c.value * 0.12 + this.holdValue(g, c), i]).sort((a, b) => b[0] - a[0]); return sc.slice(0, d.n).map(x => x[1]); }
+      case 'keep': { const sc = p.hand.map((c, i) => [this.cityValue(g, p, c) + c.value * W.keepVal + this.holdValue(g, c), i]).sort((a, b) => b[0] - a[0]); return sc.slice(0, d.n).map(x => x[1]); }
       case 'play': {
         let best = { s: -1e9 };
         p.hand.forEach((c, i) => { const s = this.cityValue(g, p, c) + this.rankValue(g, p, c) - this.holdValue(g, c); if (s > best.s) best = { s, src: 'hand', i }; });
-        if (d.early) g.display.forEach((c, i) => { const s = this.cityValue(g, p, c) + this.rankValue(g, p, c) - 2.5; if (s > best.s) best = { s, src: 'display', i }; });
+        if (d.early) g.display.forEach((c, i) => { const s = this.cityValue(g, p, c) + this.rankValue(g, p, c) - W.early; if (s > best.s) best = { s, src: 'display', i }; });
         return { src: best.src, i: best.i };
       }
       case 'chipmunk': return g.fest(11) ? -2 : 2;
@@ -449,20 +504,20 @@ const AI = {
         return d.targets[this.bestIndex(sc)];
       }
       case 'bonus': {
-        const sc = g.bonusSupply.map(t => t.vp ? 2 : t.ck ? 2.6 : t.mPer ? g.base(p).col[t.mPer] * 1.3 : t.wildColor ? 1.6 : 1.4 + (g.base(p).s[t.sym] ? 0.3 : 0));
+        const sc = g.bonusSupply.map(t => t.vp ? W.tokVp : t.ck ? W.tokCk : t.mPer ? g.base(p).col[t.mPer] * W.tokM : t.wildColor ? W.tokW : W.tokSym + (g.base(p).s[t.sym] ? 0.3 : 0));
         return this.bestIndex(sc);
       }
       case 'discard': { const sc = p.hand.map((c, i) => [this.cityValue(g, p, c) + this.holdValue(g, c) + c.value * 0.05, i]).sort((a, b) => a[0] - b[0]); return sc.slice(0, d.n).map(x => x[1]); }
       case 'take': {
-        const sc = g.display.map(c => this.cityValue(g, p, c) + this.holdValue(g, c) + c.value * 0.06);
-        if (d.deck && (!sc.length || Math.max(...sc) < 3.5)) return 'deck';
+        const sc = g.display.map(c => this.cityValue(g, p, c) + this.holdValue(g, c) + c.value * W.takeVal);
+        if (d.deck && (!sc.length || Math.max(...sc) < W.deckT)) return 'deck';
         return this.bestIndex(sc);
       }
       case 'swap': {
         if (!p.hand.length || !g.display.length) return null;
         const hv = p.hand.map(c => this.cityValue(g, p, c) + this.holdValue(g, c)); const dv = g.display.map(c => this.cityValue(g, p, c) + this.holdValue(g, c));
         const hi = hv.indexOf(Math.min(...hv)), di = this.bestIndex(dv);
-        return dv[di] > hv[hi] + 1.5 ? { h: hi, d: di } : null;
+        return dv[di] > hv[hi] + W.swapT ? { h: hi, d: di } : null;
       }
       case 'pass': { const sc = p.hand.map(c => this.cityValue(g, p, c) + this.holdValue(g, c) + c.value * 0.05); return sc.indexOf(Math.min(...sc)); }
       case 'extraPlay': { if (!p.hand.length) return -1; const sc = p.hand.map(c => this.cityValue(g, p, c) - (g.phase === 'endrank' ? 0 : this.holdValue(g, c))); return this.bestIndex(sc); }
@@ -471,6 +526,48 @@ const AI = {
     return null;
   },
 };
+}
+// Poids obtenus par entraînement (auto-confrontation) — remplis après l’entraînement
+const TRAINED_W = { sym: 0.644, symW: 1.082, ck: 2.598, condPow: 2.69, perGrow: 0.267, mpr: 1.391, fillBase: 0.608, instM: 1.232, instB: 3.072, rvM: 3.509, rvVp: 1.321, rvCk: 2.027, rvB: 3.936, rvDd: 0.326, rvPlay: 3.393, rankOff: 1.64, rankScale: 45.899, colB: 26.01, hold: 0.094, keepVal: 0.128, takeVal: 0.091, early: 1.549, swapT: 1.409, deckT: 4.568, tokVp: 1.894, tokCk: 2.908, tokM: 1.3, tokW: 1.746, tokSym: 1.496, pendFill: 0, petK: 0.937 };
+const AI = makeAI(TRAINED_W);
+const AI_EASY = makeAI();
+function aiFor(level) { return level === 'easy' ? AI_EASY : level === 'hard' ? makeHardAI(TRAINED_W) : AI; }
 
-root.MK = { Game, AI, cardName, COLOR_FR, SYMS };
+// IA Difficile : pour choisir sa carte, simule de nombreuses fins de partie possibles (Monte-Carlo)
+function makeHardAI(W0, opt = {}) {
+  const base = makeAI(W0);
+  const budget = opt.ms ?? 450, maxSims = opt.sims ?? 60, minSims = opt.min ?? 8;
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  return Object.assign({}, base, {
+    hard: true,
+    async choose(kind, d, g, p) {
+      if (kind !== 'play' || d.hidden || g.rollout || g.round < 0 || g.round > 7) return base.choose(kind, d, g, p);
+      const opts = p.hand.map((c, i) => ({ src: 'hand', i }));
+      if (d.early) g.display.forEach((c, i) => opts.push({ src: 'display', i }));
+      if (opts.length <= 1) return opts[0] || base.choose(kind, d, g, p);
+      // on écarte d’emblée les options très mal notées par l’heuristique
+      const h = opts.map(o => { const c = o.src === 'hand' ? p.hand[o.i] : g.display[o.i]; return base.cityValue(g, p, c) + base.rankValue(g, p, c) - (o.src === 'hand' ? base.holdValue(g, c) : base.W.early); });
+      const keep = opts.map((o, k) => [o, h[k]]).sort((a, b) => b[1] - a[1]).slice(0, 5).map(x => x[0]);
+      const stats = keep.map(() => ({ n: 0, v: 0 }));
+      const t0 = now(); let round = 0;
+      while (round < maxSims && (round < minSims || now() - t0 < budget)) {
+        for (let k = 0; k < keep.length; k++) {
+          const g2 = g.clone(); g2.players.forEach(q => { q.agent = base; }); g2.determinize(p.id);
+          let res;
+          try { res = await g2.rolloutFrom(p.id, keep[k]); } catch (e) { continue; }
+          res.sort((a, b) => b.total - a.total || b.pending - a.pending);
+          const mine = res.find(r => r.id === p.id), bestOther = res.find(r => r.id !== p.id);
+          const v = (res[0].id === p.id ? 1 : 0) + (mine.total - bestOther.total) / 60;
+          stats[k].n++; stats[k].v += v;
+        }
+        round++;
+        if (typeof window !== 'undefined') await new Promise(r => setTimeout(r, 0)); // laisse respirer l’interface
+      }
+      let bi = 0; stats.forEach((st, k) => { if (st.n && st.v / st.n > stats[bi].v / Math.max(1, stats[bi].n)) bi = k; });
+      return keep[bi];
+    },
+  });
+}
+
+root.MK = { Game, AI, aiFor, makeAI, makeHardAI, DEFAULT_W, TRAINED_W, cardName, COLOR_FR, SYMS };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -222,6 +222,12 @@ const STATS = {
     fAll: 'Tutte', fPets: 'Animali', festT: 'Feste', festAvg: 'Punteggio medio', festSpread: 'Scarto 1° – ultimo', tokT: 'Segnalini Bonus', low: 'pochi dati',
     note: 'Tutti i giocatori sono l’IA del gioco: questi numeri mostrano tendenze, non una verità assoluta. “Effetto sulla vittoria” confronta la percentuale di vittorie di chi ha la carta con la media.', none: 'Avvia una simulazione per vedere i risultati.' },
 };
+STATS.fr.level = 'Niveau de l’ordinateur'; STATS.fr.lvEasy = 'Facile'; STATS.fr.lvNormal = 'Normal'; STATS.fr.lvHard = 'Difficile';
+STATS.fr.lvHint = { easy: 'L’IA d’origine, réglée à la main.', normal: 'L’IA entraînée par des milliers de parties contre elle-même.', hard: 'L’IA entraînée qui, en plus, simule des fins de partie avant chaque carte jouée.' };
+STATS.en.level = 'Computer level'; STATS.en.lvEasy = 'Easy'; STATS.en.lvNormal = 'Normal'; STATS.en.lvHard = 'Hard';
+STATS.en.lvHint = { easy: 'The original hand-tuned AI.', normal: 'The AI trained over thousands of games against itself.', hard: 'The trained AI that also simulates possible endings before each card it plays.' };
+STATS.it.level = 'Livello del computer'; STATS.it.lvEasy = 'Facile'; STATS.it.lvNormal = 'Normale'; STATS.it.lvHard = 'Difficile';
+STATS.it.lvHint = { easy: 'L’IA originale, regolata a mano.', normal: 'L’IA allenata con migliaia di partite contro sé stessa.', hard: 'L’IA allenata che in più simula possibili finali prima di ogni carta giocata.' };
 Object.assign(FR, STATS.fr); Object.assign(EN, STATS.en); Object.assign(IT, STATS.it);
 window.MK_I18N = { fr: FR, en: EN, it: IT, FEST };
 }
