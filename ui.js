@@ -85,10 +85,10 @@ function settings() {
   return { name, fest, wild, n: nPlayers };
 }
 function show(id) { for (const s of ['setup', 'lobby', 'game', 'stats']) $(s).style.display = s === id ? (s === 'game' || s === 'stats' ? 'block' : 'grid') : 'none'; }
-function backToMenu() { unsub.forEach(f => f()); unsub = []; G = null; V = null; P = null; room = null; remote = {}; remoteSeats = new Set(); mode = 'solo'; $('modal').innerHTML = ''; show('setup'); }
+function backToMenu() { endTuto(); unsub.forEach(f => f()); unsub = []; G = null; V = null; P = null; room = null; remote = {}; remoteSeats = new Set(); mode = 'solo'; $('modal').innerHTML = ''; show('setup'); }
 
 // ---------- solo ----------
-const human = { choose(kind, d) { return new Promise(res => { P = { kind, d, res, sel: [] }; if (kind === 'bonus') bonusModal(); refresh(); }); } };
+const human = { choose(kind, d) { return new Promise(res => { P = { kind, d, res, sel: [] }; if (kind === 'bonus') bonusModal(); refresh(); tutoOn(kind); }); } };
 function answer(v) {
   const p = P; P = null; $('modal').innerHTML = '';
   if (mode === 'client') { NET.set(`rooms/${room}/answers/${ME}`, JSON.stringify({ id: p.id, v })); render(); return; }
@@ -101,13 +101,14 @@ function startSolo() {
   runGame(players, s);
 }
 function runGame(players, s) {
-  G = new Game({ players, festivals: s.fest, wild: s.wild, onEvent });
+  G = new Game({ players, festivals: s.fest, wild: s.wild, onEvent, seed: s.seed });
   show('game'); refresh();
   const g = G;
   G.run().then(() => { if (g !== G) return; refresh(); endModal(); }).catch(err => { if (g === G) { console.error(err); $('status').textContent = 'Erreur : ' + err.message; } });
 }
 async function onEvent(g, ev) {
   if (g !== G) throw new Error('partie abandonnée');
+  if (TUTO && ev.msg) { const k = ev.msg[0]; if (k === 'ranking') tutoOn('rank'); else if (k === 'endRank') tutoOn('endRank'); else if (k === 'over') tutoOn('over'); }
   refresh();
   const mine = ev.who === ME;
   const ms = mine ? 60 : ({ play: 650, take: 420, rank: 900, phase: 700, fest: 1100, gain: 260 })[ev.kind] || 200;
@@ -389,7 +390,7 @@ function endModal() {
 }
 
 // ---------- statistiques (simulations entre IA) ----------
-let SN = 3, SG = 500, SRES = null, SSORT = 'edge', SFILT = 'all', worker = null;
+let FSORT = 'avg', SN = 3, SG = 500, SRES = null, SSORT = 'edge', SFILT = 'all', worker = null;
 // cumul des simulations par configuration (3 000 parties max, les plus anciennes sont retirées)
 const SMAX = 3000;
 const cfgKey = () => `${SN}-${$('swild').checked ? 1 : 0}-${$('sfest').checked ? 1 : 0}`;
@@ -428,7 +429,7 @@ $('sclear').addEventListener('click', () => { const all = loadBatches(); delete 
 $('statsBack').addEventListener('click', () => { if (worker) { worker.terminate(); worker = null; } show('setup'); });
 $('srun').addEventListener('click', () => {
   if (worker) worker.terminate();
-  try { worker = new Worker('sim-worker.js?v=7'); } catch (e) { $('sprog').textContent = e.message; return; }
+  try { worker = new Worker('sim-worker.js?v=8'); } catch (e) { $('sprog').textContent = e.message; return; }
   $('srun').disabled = true; $('sbar').firstElementChild.style.width = '0'; $('sprog').textContent = t('running', { p: 0 });
   worker.onmessage = (e) => {
     const d = e.data;
@@ -439,6 +440,7 @@ $('srun').addEventListener('click', () => {
   worker.postMessage({ n: SN, games: SG, fest: $('sfest').checked, wild: $('swild').checked });
 });
 document.addEventListener('click', e => {
+  const fth = e.target.closest('[data-fsort]'); if (fth) { FSORT = fth.dataset.fsort; drawStats(); return; }
   const th = e.target.closest('[data-sort]'); if (th) { SSORT = th.dataset.sort; drawStats(); return; }
   const f = e.target.closest('[data-filt]'); if (f) { SFILT = f.dataset.filt; drawStats(); }
 });
@@ -454,7 +456,8 @@ function drawStats() {
   const edgeCell = (e) => `<span class="edge ${e >= 0 ? 'pos' : 'neg'}">${e >= 0 ? '+' : ''}${Math.round(e * 100)} %</span>`;
   const th = (k, label) => `<th data-sort="${k}">${label}${SSORT === k ? ' ▾' : ''}</th>`;
   const filt = ['all', 'pink', 'green', 'blue'].concat(r.card.wp4 || r.card.wb1 ? ['pets'] : []).map(f => `<button type="button" data-filt="${f}" aria-pressed="${f === SFILT}">${f === 'all' ? t('fAll') : f === 'pets' ? t('fPets') : LD().color[f]}</button>`).join('');
-  const festRows = Object.entries(r.fest || {}).map(([k, s]) => ({ f: D.FESTIVALS[k - 1], avg: s.total / s.games, spread: s.vp / s.games, games: Math.round(s.games) })).sort((a, b) => b.avg - a.avg);
+  const festRows = Object.entries(r.fest || {}).map(([k, s]) => ({ f: D.FESTIVALS[k - 1], avg: s.total / s.games, spread: s.vp / s.games, games: Math.round(s.games) })).sort((a, b) => FSORT === 'name' ? a.f.n - b.f.n : b[FSORT] - a[FSORT]);
+  const fth = (k, label) => `<th data-fsort="${k}">${label}${FSORT === k ? ' ▾' : ''}</th>`;
   const tokRows = Object.entries(r.tok || {}).map(([id, s]) => ({ id, games: Math.round(s.games), edge: (s.wins / s.games) / base - 1, owner: s.total / s.games })).sort((a, b) => b.edge - a.edge);
   box.innerHTML = `
     <div class="kpis"><div class="kpi"><b>${Math.round(r.games - r.errors)}</b><span>${t('sGames')} · ${t('cum', { m: SMAX.toLocaleString(LANG) })}</span></div><div class="kpi"><b>${r.avg.win.toFixed(1)}</b><span>${t('avgWin')}</span></div><div class="kpi"><b>${r.avg.all.toFixed(1)}</b><span>${t('avgAll')}</span></div></div>
@@ -464,11 +467,42 @@ function drawStats() {
       <tr>${th('name', t('cCard'))}${th('edge', t('cEdge'))}${th('win', t('cWin'))}${th('games', t('cPlayed'))}${th('owner', t('cOwner'))}${th('vp', t('cVp'))}${th('act', t('cAct'))}</tr>
       ${rows.map(x => `<tr class="${x.games < minG ? 'low' : ''}" title="${x.games < minG ? t('low') : ''}"><td><span class="cn"><img src="img/${x.id}.jpg" alt="" data-zoom="img/${x.id}.jpg">${esc(cardN(x.id))}</span></td><td>${edgeCell(x.edge)}</td><td>${pct(x.win)}</td><td>${x.games}</td><td>${x.owner.toFixed(1)}</td><td>${x.vp.toFixed(1)}</td><td>${x.act === null ? '—' : pct(x.act)}</td></tr>`).join('')}
     </table></div></div>
-    ${festRows.length ? `<div class="zone" style="margin-top:14px"><h3>${t('festT')}</h3><div class="scroll"><table class="stab"><tr><th>${t('festT')}</th><th>${t('festAvg')}</th><th>${t('festSpread')}</th><th>${t('sGames')}</th></tr>
+    ${festRows.length ? `<div class="zone" style="margin-top:14px"><h3>${t('festT')}</h3><div class="scroll"><table class="stab"><tr>${fth('name', t('festT'))}${fth('avg', t('festAvg'))}${fth('spread', t('festSpread'))}${fth('games', t('sGames'))}</tr>
       ${festRows.map(x => `<tr><td><span class="cn"><img src="img/f${x.f.n}.jpg" alt="" data-zoom="img/f${x.f.n}.jpg" style="width:40px">${esc(x.f.name)}</span></td><td>${x.avg.toFixed(1)}</td><td>${x.spread.toFixed(1)}</td><td>${x.games}</td></tr>`).join('')}</table></div></div>` : ''}
     <div class="zone" style="margin-top:14px"><h3>${t('tokT')}</h3><div class="scroll"><table class="stab"><tr><th>${t('tokT')}</th><th>${t('cEdge')}</th><th>${t('cPlayed')}</th><th>${t('cOwner')}</th></tr>
       ${tokRows.map(x => `<tr><td>${tokHtml(x.id)}</td><td>${edgeCell(x.edge)}</td><td>${x.games}</td><td>${x.owner.toFixed(1)}</td></tr>`).join('')}</table></div></div>`;
 }
+
+
+// ---------- tutoriel ----------
+let TUTO = null;
+const TT = () => I18N.TUTO[LANG] || I18N.TUTO.fr;
+function startTutorial() {
+  const name = ($('pname').value || t('defaultName')).trim().slice(0, 16);
+  mode = 'solo'; ME = 0; TUTO = { seen: new Set(), queue: [] };
+  runGame([{ name, human: true, color: COLORS[0], agent: human }, { name: AI_NAMES[0], color: COLORS[1], agent: aiFor('easy') }], { fest: false, wild: false, seed: 2026 });
+  TUTO.queue.push(...TT().intro.map((x, i) => ({ intro: i }))); coachNext();
+}
+function tutoOn(kind) {
+  if (!TUTO || TUTO.seen.has(kind) || !TT()[kind]) return;
+  TUTO.seen.add(kind); TUTO.queue.push({ kind }); if (!TUTO.cur) coachNext();
+}
+function coachNext() {
+  document.querySelectorAll('.hl').forEach(e => e.classList.remove('hl'));
+  if (!TUTO) return;
+  const step = TUTO.queue.shift(); TUTO.cur = step || null;
+  const box = $('coach');
+  if (!step) { box.innerHTML = ''; return; }
+  const [title, text, sel] = step.intro !== undefined ? TT().intro[step.intro] : TT()[step.kind];
+  if (sel) setTimeout(() => { const el = document.querySelector(sel); if (el) { el.classList.add('hl'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } }, 50);
+  const more = TUTO.queue.length > 0;
+  box.innerHTML = `<div class="coach" role="dialog"><b>${title}</b>${text}<div class="cbtn"><button class="ghost" id="cstop">${TT().stop}</button><button id="cnext">${more ? TT().next : TT().close}</button></div></div>`;
+  $('cnext').onclick = coachNext; $('cstop').onclick = endTuto;
+}
+function endTuto() { TUTO = null; document.querySelectorAll('.hl').forEach(e => e.classList.remove('hl')); const b = $('coach'); if (b) b.innerHTML = ''; }
+$('tuto').addEventListener('click', startTutorial);
+// hors de GitHub Pages (version Claude), les règles PDF sont lues sur le site GitHub
+if (!/github\.io$/.test(location.hostname) && !/localhost|127\.0\.0\.1/.test(location.hostname)) document.querySelectorAll('.homelinks a').forEach(a => { a.href = 'https://stfrantic82.github.io/MinikinCity/' + a.getAttribute('href'); });
 
 window.MKUI = { get G() { return G; }, get V() { return V; }, get P() { return P; }, get mode() { return mode; }, answer, startSolo };
 

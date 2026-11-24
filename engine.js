@@ -106,7 +106,9 @@ class Game {
     if (eff.k === 'per') return mul(eff.gain, this.count(eff.per, x));
     return {};
   }
-  active(slot) { return slot.c.type === 'S' && slot.m >= slot.c.spaces; }
+  active(slot) { return slot.c.type === 'S' && !slot.noEff && (this._pot || slot.m >= slot.c.spaces); }
+  // score « potentiel » : comme si tous les bâtiments étaient remplis (sert à l’IA)
+  potScore(p) { this._pot = true; try { return this.score(p).total; } finally { this._pot = false; } }
 
   score(p) {
     let best = null;
@@ -427,7 +429,7 @@ class Game {
 const DEFAULT_W = { sym: 0.9, symW: 1.3, ck: 2.6, condPow: 2, perGrow: 0.4, mpr: 1.5, fillBase: 0.3, instM: 1.4, instB: 3,
   rvM: 1.3, rvVp: 1, rvCk: 2.6, rvB: 3, rvDd: 0.8, rvPlay: 3, rankOff: 4, rankScale: 38, colB: 22,
   hold: 0.3, keepVal: 0.12, takeVal: 0.06, early: 2.5, swapT: 1.5, deckT: 3.5,
-  tokVp: 2, tokCk: 2.6, tokM: 1.3, tokW: 1.6, tokSym: 1.4, pendFill: 0, petK: 1 };
+  tokVp: 2, tokCk: 2.6, tokM: 1.3, tokW: 1.6, tokSym: 1.4, pendFill: 0, petK: 1, syn: 0 };
 function makeAI(W0) {
 const W = Object.assign({}, DEFAULT_W, W0 || {});
 const RV = (rw) => !rw ? 0 : (rw.m || 0) * W.rvM + (rw.vp || 0) * W.rvVp + (rw.ck || 0) * W.rvCk + (rw.bonus || 0) * W.rvB + (rw.dd || 0) * W.rvDd + (rw.play ? W.rvPlay : 0);
@@ -437,6 +439,10 @@ return {
   cityValue(g, p, card) {
     let v = card.sym.reduce((a, s) => a + (s === 'W' ? W.symW : W.sym), 0);
     const left = g.roundsLeft();
+    if (W.syn && p.city.length) { // ce que la carte apporte aux autres bâtiments (symboles, couleurs, valeurs)
+      const before = g.potScore(p); p.city.push({ c: card, m: card.spaces, noEff: true });
+      try { v += W.syn * Math.max(0, g.potScore(p) - before); } finally { p.city.pop(); }
+    }
     const fake = { c: card, m: card.spaces };
     p.city.push(fake);
     try {
@@ -528,7 +534,7 @@ return {
 };
 }
 // Poids obtenus par entraînement (auto-confrontation) — remplis après l’entraînement
-const TRAINED_W = { sym: 0.644, symW: 1.082, ck: 2.598, condPow: 2.69, perGrow: 0.267, mpr: 1.391, fillBase: 0.608, instM: 1.232, instB: 3.072, rvM: 3.509, rvVp: 1.321, rvCk: 2.027, rvB: 3.936, rvDd: 0.326, rvPlay: 3.393, rankOff: 1.64, rankScale: 45.899, colB: 26.01, hold: 0.094, keepVal: 0.128, takeVal: 0.091, early: 1.549, swapT: 1.409, deckT: 4.568, tokVp: 1.894, tokCk: 2.908, tokM: 1.3, tokW: 1.746, tokSym: 1.496, pendFill: 0, petK: 0.937 };
+const TRAINED_W = { sym: 0.482, symW: 1.082, ck: 2.598, condPow: 2.69, perGrow: 0.267, mpr: 1.229, fillBase: 0.608, instM: 1.232, instB: 3.072, rvM: 3.509, rvVp: 1.321, rvCk: 2.027, rvB: 3.936, rvDd: 0.326, rvPlay: 3.393, rankOff: 1.64, rankScale: 45.899, colB: 26.01, hold: 0.078, keepVal: 0.121, takeVal: 0.091, early: 1.549, swapT: 1.276, deckT: 4.568, tokVp: 2.664, tokCk: 2.908, tokM: 1.3, tokW: 1.746, tokSym: 1.496, pendFill: 0.059, petK: 0.937, syn: 0.619 };
 const AI = makeAI(TRAINED_W);
 const AI_EASY = makeAI();
 function aiFor(level) { return level === 'easy' ? AI_EASY : level === 'hard' ? makeHardAI(TRAINED_W) : AI; }

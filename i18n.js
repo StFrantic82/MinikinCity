@@ -3,7 +3,7 @@
 const pl = (n, one, many) => (n > 1 ? many : one);
 const FR = {
   // accueil
-  tagline: 'Construisez la ville des Minikins avec des cartes à double sens.',
+  tagline: 'Construisez la ville des Minikins',
   setupTitle: 'Nouvelle partie', tabSolo: 'Contre l’ordinateur', tabOnline: 'En ligne', nameLabel: 'Votre nom', defaultName: 'Moi',
   nLabel: 'Nombre de joueurs', hintSolo: 'Vous jouez contre des Minikins pilotés par l’ordinateur.', hintOnline: 'Les places non prises par des amis seront jouées par l’ordinateur.',
   extLabel: 'Extensions', wildDesc: '13 animaux ajoutés aux cartes Ville et une carte Récompense grise sans meilleure couleur.',
@@ -68,7 +68,7 @@ const FR = {
   },
 };
 const EN = {
-  tagline: 'Build the Minikins’ city with cards that have a double meaning.',
+  tagline: 'Build the Minikins’ city',
   setupTitle: 'New game', tabSolo: 'Against the computer', tabOnline: 'Online', nameLabel: 'Your name', defaultName: 'Me',
   nLabel: 'Number of players', hintSolo: 'You play against Minikins run by the computer.', hintOnline: 'Seats not taken by friends are played by the computer.',
   extLabel: 'Expansions', wildDesc: '13 animals added to the City cards and a grey Reward card with no best color.',
@@ -126,7 +126,7 @@ const EN = {
   },
 };
 const IT = {
-  tagline: 'Costruisci la città dei Minikin con carte dal doppio significato.',
+  tagline: 'Costruisci la città dei Minikin',
   setupTitle: 'Nuova partita', tabSolo: 'Contro il computer', tabOnline: 'Online', nameLabel: 'Il tuo nome', defaultName: 'Io',
   nLabel: 'Numero di giocatori', hintSolo: 'Giochi contro Minikin guidati dal computer.', hintOnline: 'I posti non occupati dagli amici saranno giocati dal computer.',
   extLabel: 'Espansioni', wildDesc: '13 animali aggiunti alle carte Città e una carta Ricompensa grigia senza colore migliore.',
@@ -231,6 +231,59 @@ STATS.it.lvHint = { easy: 'L’IA originale, regolata a mano.', normal: 'L’IA 
 STATS.fr.cum = 'cumulées (max {m}, les plus anciennes sont remplacées)'; STATS.fr.clearStats = 'Effacer les résultats';
 STATS.en.cum = 'combined (max {m}, oldest are replaced)'; STATS.en.clearStats = 'Clear results';
 STATS.it.cum = 'cumulate (max {m}, le più vecchie vengono sostituite)'; STATS.it.clearStats = 'Cancella i risultati';
+Object.assign(STATS.fr, { home: 'Accueil', tutorial: 'Tutoriel (première partie)', rulesLbl: 'Règles :', rulesBase: 'Jeu de base' });
+Object.assign(STATS.en, { home: 'Home', tutorial: 'Tutorial (first game)', rulesLbl: 'Rules:', rulesBase: 'Base game' });
+Object.assign(STATS.it, { home: 'Home', tutorial: 'Tutorial (prima partita)', rulesLbl: 'Regole:', rulesBase: 'Gioco base' });
 Object.assign(FR, STATS.fr); Object.assign(EN, STATS.en); Object.assign(IT, STATS.it);
-window.MK_I18N = { fr: FR, en: EN, it: IT, FEST };
+const TUTO = {
+  fr: {
+    next: 'Suivant', close: 'Fermer', stop: 'Quitter le tutoriel',
+    intro: [['Bienvenue à Minikin City !', 'Chaque carte a deux usages : sa <b>valeur et sa couleur</b> servent à gagner des récompenses à chaque manche, et son <b>bâtiment</b> rejoint votre ville pour marquer des points.', null],
+      ['L’année en 8 manches', 'En haut, une carte Récompense par manche. Sa couleur est la <b>meilleure couleur</b> de la manche : les cartes de cette couleur battent toutes les autres, puis la plus forte valeur gagne.', '#year'],
+      ['La fin de partie', 'La 9<sup>e</sup> carte, cachée sous la tuile, donne la couleur du <b>classement final</b> : à la fin, on additionne les cartes de cette couleur restées en main.', '.ycol:last-child'],
+      ['Votre main', 'Voici vos cartes. Pour commencer, vous en gardez 4 sur 6.', '#myhand']],
+    keep: ['Garder 4 cartes', 'Cliquez sur 4 cartes puis sur « Valider ». Gardez des bâtiments intéressants, et quelques grosses valeurs pour gagner des manches.', '#myhand'],
+    play: ['Jouer une carte', 'À votre tour, jouez une carte de votre main. Elle compte pour le classement de la manche <b>et</b> se pose dans votre ville. Regardez la meilleure couleur indiquée au-dessus des cartes jouées.', '#myhand'],
+    rank: ['Le classement', 'Les numéros sur les cartes jouées donnent le classement. Chaque joueur reçoit la récompense de sa ligne sur la carte Récompense : PV, Minikins, cocardes ou jetons Bonus.', '#plays'],
+    placeMinikin: ['Placer un Minikin', 'Un bâtiment ne rapporte des points que s’il est <b>rempli de Minikins</b>. Cliquez sur un bâtiment surligné pour y poser un Minikin.', '#mycity'],
+    take: ['Prendre une carte', 'Du dernier au premier, chacun prend une carte de l’offre. Être dernier a un avantage : vous choisissez en premier !', '#display'],
+    bonus: ['Jeton Bonus', 'Un jeton Bonus vous donne un symbole, des PV, une cocarde ou des Minikins. Choisissez celui qui aide le plus votre ville.', null],
+    discard: ['Remettre des cartes', 'Choisissez les cartes à remettre sous la pioche.', '#myhand'],
+    endRank: ['Le classement final', 'On additionne les cartes de la meilleure couleur restées en main. Le gagnant joue en plus une carte dans sa ville.', '#year'],
+    over: ['Fin de la partie !', 'Le score additionne les PV de récompenses, les jetons, les bâtiments remplis et les cocardes. Vous connaissez maintenant les bases : à vous de jouer !', null],
+  },
+  en: {
+    next: 'Next', close: 'Close', stop: 'Leave tutorial',
+    intro: [['Welcome to Minikin City!', 'Every card has two uses: its <b>value and color</b> win rewards each round, and its <b>building</b> joins your city to score points.', null],
+      ['A year of 8 rounds', 'At the top, one Reward card per round. Its color is the round’s <b>best color</b>: cards of that color beat all others, then the highest value wins.', '#year'],
+      ['The end of the game', 'The 9th card, under the tile, gives the color of the <b>final ranking</b>: at the end, you add up the cards of that color left in your hand.', '.ycol:last-child'],
+      ['Your hand', 'These are your cards. To start, you keep 4 of these 6.', '#myhand']],
+    keep: ['Keep 4 cards', 'Click 4 cards, then “Confirm”. Keep useful buildings, and some high values to win rounds.', '#myhand'],
+    play: ['Play a card', 'On your turn, play a card from your hand. It counts for the round’s ranking <b>and</b> goes into your city. Check the best color shown above the played cards.', '#myhand'],
+    rank: ['The ranking', 'The numbers on the played cards show the ranking. Each player gets the reward on their row of the Reward card: VP, Minikins, cockades or Bonus tokens.', '#plays'],
+    placeMinikin: ['Place a Minikin', 'A building only scores when it is <b>filled with Minikins</b>. Click a highlighted building to place a Minikin.', '#mycity'],
+    take: ['Take a card', 'From last to first, each player takes a card from the open display. Being last has a perk: you choose first!', '#display'],
+    bonus: ['Bonus token', 'A Bonus token gives you a symbol, VP, a cockade or Minikins. Pick the one that helps your city most.', null],
+    discard: ['Put cards back', 'Choose the cards to put at the bottom of the deck.', '#myhand'],
+    endRank: ['The final ranking', 'Add up the cards of the best color left in hand. The winner also plays one more card into their city.', '#year'],
+    over: ['Game over!', 'Your score adds reward VP, tokens, filled buildings and cockades. You now know the basics: your turn to play!', null],
+  },
+  it: {
+    next: 'Avanti', close: 'Chiudi', stop: 'Esci dal tutorial',
+    intro: [['Benvenuto a Minikin City!', 'Ogni carta ha due usi: il suo <b>valore e colore</b> fanno vincere ricompense a ogni round, e il suo <b>edificio</b> entra nella tua città per fare punti.', null],
+      ['Un anno di 8 round', 'In alto, una carta Ricompensa per round. Il suo colore è il <b>colore migliore</b> del round: le carte di quel colore battono tutte le altre, poi vince il valore più alto.', '#year'],
+      ['La fine della partita', 'La 9ª carta, sotto la tessera, indica il colore della <b>classifica finale</b>: alla fine si sommano le carte di quel colore rimaste in mano.', '.ycol:last-child'],
+      ['La tua mano', 'Queste sono le tue carte. Per iniziare, ne tieni 4 su 6.', '#myhand']],
+    keep: ['Tieni 4 carte', 'Clicca su 4 carte e poi su “Conferma”. Tieni edifici utili e qualche valore alto per vincere i round.', '#myhand'],
+    play: ['Gioca una carta', 'Al tuo turno, gioca una carta dalla mano. Conta per la classifica del round <b>e</b> va nella tua città. Guarda il colore migliore indicato sopra le carte giocate.', '#myhand'],
+    rank: ['La classifica', 'I numeri sulle carte giocate indicano la classifica. Ogni giocatore riceve la ricompensa della sua riga sulla carta Ricompensa: PV, Minikin, coccarde o segnalini Bonus.', '#plays'],
+    placeMinikin: ['Posiziona un Minikin', 'Un edificio fa punti solo se è <b>pieno di Minikin</b>. Clicca su un edificio evidenziato per metterci un Minikin.', '#mycity'],
+    take: ['Prendi una carta', 'Dall’ultimo al primo, ognuno prende una carta dall’offerta. Essere ultimo ha un vantaggio: scegli per primo!', '#display'],
+    bonus: ['Segnalino Bonus', 'Un segnalino Bonus dà un simbolo, PV, una coccarda o dei Minikin. Scegli quello che aiuta di più la tua città.', null],
+    discard: ['Rimetti delle carte', 'Scegli le carte da mettere in fondo al mazzo.', '#myhand'],
+    endRank: ['La classifica finale', 'Si sommano le carte del colore migliore rimaste in mano. Il vincitore gioca anche una carta in più nella sua città.', '#year'],
+    over: ['Fine della partita!', 'Il punteggio somma i PV delle ricompense, i segnalini, gli edifici pieni e le coccarde. Ora conosci le basi: tocca a te!', null],
+  },
+};
+window.MK_I18N = { fr: FR, en: EN, it: IT, FEST, TUTO };
 }
