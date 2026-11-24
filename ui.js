@@ -62,7 +62,6 @@ function drawSeg() {
   $('lvseg').innerHTML = ['easy', 'normal', 'hard'].map((l, k) => `<button type="button" aria-pressed="${l === LEVEL}" data-lv="${l}"><span class="pw">${PW.slice(0, k + 1).map(c => `<img src="img/pawn_${c}.png" alt="">`).join('')}</span>${t({ easy: 'lvEasy', normal: 'lvNormal', hard: 'lvHard' }[l])}</button>`).join('');
   document.querySelector('.setupcard.home').dataset.mode = tab;
   const lvRow = $('lvseg').closest('.hrow'); lvRow.style.display = tab === 'stats' ? 'none' : ''; $('lvhint').style.display = lvRow.style.display;
-  $('exthint').textContent = ($('xwild').checked ? t('wildDesc') + ' ' : '') + ($('xfest').checked ? t('festDesc') : '');
   drawRules();
   $('lvhint').textContent = LD().lvHint[LEVEL];
   $('netoff').style.display = NET ? 'none' : '';
@@ -442,7 +441,7 @@ $('sclear').addEventListener('click', () => { const all = loadBatches(); delete 
 $('statsBack').addEventListener('click', () => { if (worker) { worker.terminate(); worker = null; } show('setup'); });
 $('srun').addEventListener('click', () => {
   if (worker) worker.terminate();
-  try { worker = new Worker('sim-worker.js?v=9'); } catch (e) { $('sprog').textContent = e.message; return; }
+  try { worker = new Worker('sim-worker.js?v=10'); } catch (e) { $('sprog').textContent = e.message; return; }
   $('srun').disabled = true; $('sbar').firstElementChild.style.width = '0'; $('sprog').textContent = t('running', { p: 0 });
   worker.onmessage = (e) => {
     const d = e.data;
