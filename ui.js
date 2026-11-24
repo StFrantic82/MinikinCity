@@ -54,11 +54,16 @@ let room = null, unsub = [], remote = {}, remoteSeats = new Set(), promptSeq = 0
 try { const s = JSON.parse(localStorage.getItem('mk-setup') || '{}'); if (s.n) nPlayers = s.n; if (s.level) LEVEL = s.level; if (s.name) $('pname').value = s.name; $('xfest').checked = !!s.fest; $('xwild').checked = !!s.wild; } catch (e) {}
 function drawSeg() {
   $('nseg').innerHTML = [2, 3, 4, 5].map(n => `<button type="button" aria-pressed="${n === nPlayers}" data-n="${n}">${n}</button>`).join('');
-  $('tabs').innerHTML = ['solo', 'online', 'stats'].map(tb => `<button type="button" aria-pressed="${tb === tab}" data-tab="${tb}">${tb === 'solo' ? t('tabSolo') : tb === 'online' ? t('tabOnline') : t('tabStats')}</button>`).join('');
+  $('tabs').innerHTML = ['solo', 'online'].map(tb => `<button type="button" aria-pressed="${tb === tab}" data-tab="${tb}">${tb === 'solo' ? t('tabSolo') : tb === 'online' ? t('tabOnline') : t('tabStats')}</button>`).join('');
   $('soloBox').style.display = tab === 'solo' ? '' : 'none';
   $('onlineBox').style.display = tab === 'online' ? '' : 'none';
   $('nhint').textContent = tab === 'solo' ? t('hintSolo') : t('hintOnline');
-  $('lvseg').innerHTML = ['easy', 'normal', 'hard'].map(l => `<button type="button" aria-pressed="${l === LEVEL}" data-lv="${l}">${t({ easy: 'lvEasy', normal: 'lvNormal', hard: 'lvHard' }[l])}</button>`).join('');
+  const PW = ['green', 'pink', 'acorn'];
+  $('lvseg').innerHTML = ['easy', 'normal', 'hard'].map((l, k) => `<button type="button" aria-pressed="${l === LEVEL}" data-lv="${l}"><span class="pw">${PW.slice(0, k + 1).map(c => `<img src="img/pawn_${c}.png" alt="">`).join('')}</span>${t({ easy: 'lvEasy', normal: 'lvNormal', hard: 'lvHard' }[l])}</button>`).join('');
+  document.querySelector('.setupcard.home').dataset.mode = tab;
+  const lvRow = $('lvseg').closest('.hrow'); lvRow.style.display = tab === 'stats' ? 'none' : ''; $('lvhint').style.display = lvRow.style.display;
+  $('exthint').textContent = ($('xwild').checked ? t('wildDesc') + ' ' : '') + ($('xfest').checked ? t('festDesc') : '');
+  drawRules();
   $('lvhint').textContent = LD().lvHint[LEVEL];
   $('netoff').style.display = NET ? 'none' : '';
   $('create').disabled = !NET; $('join').disabled = !NET;
@@ -67,6 +72,14 @@ applyStatic();
 if (!$('pname').value) $('pname').value = t('defaultName');
 drawSeg();
 $('lvseg').addEventListener('click', e => { const b = e.target.closest('[data-lv]'); if (b) { LEVEL = b.dataset.lv; drawSeg(); } });
+$('xwild').addEventListener('change', drawSeg); $('xfest').addEventListener('change', drawSeg);
+function drawRules() {
+  const L = LANG, f = { fr: 'FR', en: 'EN', it: 'IT' }[L];
+  const fest = { FR: 'Minikin_City_Festivals_FR.pdf', EN: 'Minikin_City_Festivals_EN.pdf', IT: 'Minikin_City_Festivals_IT.pdf' }[f];
+  const tag = (x) => x !== f ? ` <small>(${x})</small>` : '';
+  const base = /github\.io$|localhost|127\.0\.0\.1/.test(location.hostname) ? 'rules/' : 'https://stfrantic82.github.io/MinikinCity/rules/';
+  $('rulelinks').innerHTML = `<a href="${base}Minikin_City_Rules_EN.pdf" target="_blank" rel="noopener">${t('rulesBase')}${tag('EN')}</a> <a href="${base}Minikin_City_Wild_Friends_EN.pdf" target="_blank" rel="noopener">Wild Friends${tag('EN')}</a> <a href="${base}${fest}" target="_blank" rel="noopener">Festivals</a>`;
+}
 $('nseg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { nPlayers = +b.dataset.n; drawSeg(); } });
 $('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.tab === 'stats') { openStats(); return; } tab = b.dataset.tab; drawSeg(); });
 $('start').addEventListener('click', startSolo);
@@ -429,7 +442,7 @@ $('sclear').addEventListener('click', () => { const all = loadBatches(); delete 
 $('statsBack').addEventListener('click', () => { if (worker) { worker.terminate(); worker = null; } show('setup'); });
 $('srun').addEventListener('click', () => {
   if (worker) worker.terminate();
-  try { worker = new Worker('sim-worker.js?v=8'); } catch (e) { $('sprog').textContent = e.message; return; }
+  try { worker = new Worker('sim-worker.js?v=9'); } catch (e) { $('sprog').textContent = e.message; return; }
   $('srun').disabled = true; $('sbar').firstElementChild.style.width = '0'; $('sprog').textContent = t('running', { p: 0 });
   worker.onmessage = (e) => {
     const d = e.data;
@@ -501,8 +514,7 @@ function coachNext() {
 }
 function endTuto() { TUTO = null; document.querySelectorAll('.hl').forEach(e => e.classList.remove('hl')); const b = $('coach'); if (b) b.innerHTML = ''; }
 $('tuto').addEventListener('click', startTutorial);
-// hors de GitHub Pages (version Claude), les règles PDF sont lues sur le site GitHub
-if (!/github\.io$/.test(location.hostname) && !/localhost|127\.0\.0\.1/.test(location.hostname)) document.querySelectorAll('.homelinks a').forEach(a => { a.href = 'https://stfrantic82.github.io/MinikinCity/' + a.getAttribute('href'); });
+$('statsBtn').addEventListener('click', openStats);
 
 window.MKUI = { get G() { return G; }, get V() { return V; }, get P() { return P; }, get mode() { return mode; }, answer, startSolo };
 

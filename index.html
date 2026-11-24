@@ -131,8 +131,40 @@ input[type=text]{font:16px Nunito;padding:10px 12px;border-radius:12px;border:2p
 .stab .cn{display:flex;align-items:center;gap:10px}.stab .cn img{width:34px;border-radius:4px}
 .edge{display:inline-block;min-width:64px;padding:2px 8px;border-radius:999px;font-weight:800}.edge.pos{background:light-dark(#dcf1c8,#2d4420)}.edge.neg{background:light-dark(#fbd7d0,#4a2620)}
 .filters{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.filters button{min-height:36px;padding:6px 12px}.filters button[aria-pressed=false]{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 2px var(--line)}
+@font-face{font-family:Yum;src:url(fonts/yumelo_mk.ttf)}
+.setupcard.home{padding:0;overflow:hidden;background:#fff;border:3px solid #fff;box-shadow:0 18px 50px rgba(74,43,37,.18)}
+.modetabs{display:grid;grid-template-columns:repeat(2,1fr);gap:0}
+.modetabs button{border-radius:0;min-height:58px;font:400 17px Yum,Fredoka,sans-serif;text-transform:uppercase;letter-spacing:.4px;color:#3a2622;-webkit-text-stroke:3px #fff;paint-order:stroke fill;opacity:.55;transition:opacity .15s}
+.modetabs button:nth-child(1){background:#ee7aa0}.modetabs button:nth-child(2){background:#86c040}.modetabs button:nth-child(3){background:#62a8dc}
+.modetabs button[aria-pressed=true]{opacity:1}
+.hpanel{padding:16px 18px 6px;background:linear-gradient(#fdeef3,#fff 60%);transition:background .2s}
+.home[data-mode=online] .hpanel{background:linear-gradient(#eef7e2,#fff 60%)}
+.hrow{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(255,255,255,.85);border-radius:999px;padding:6px 8px 6px 16px;margin:8px 0;box-shadow:0 1px 0 rgba(58,38,34,.06),inset 0 0 0 2px #f1e6dc}
+.hrow.col{flex-direction:column;align-items:stretch;border-radius:20px;padding:10px 12px}
+.hl2{font:400 13px Yum,Fredoka,sans-serif;text-transform:uppercase;letter-spacing:.4px;color:#3a2622;white-space:nowrap}
+.namebox{display:flex;align-items:center;gap:4px;background:#fff;border-radius:999px;box-shadow:inset 0 0 0 2px #e6d6c6;padding:0 12px 0 4px;flex:1;max-width:240px}
+.namebox img{height:34px;margin:-4px 0}.namebox input{border:0;box-shadow:none;min-height:40px;padding:0;background:transparent;font:600 16px Nunito,sans-serif}
+.namebox input:focus{outline:none}.namebox:focus-within{box-shadow:inset 0 0 0 2px #3a2622}
+.dots{display:flex;gap:8px}.dots button{width:44px;height:44px;min-height:0;padding:0;border-radius:50%;background:#fff;color:#3a2622;border:2.5px solid #3a2622;font:400 18px Yum,Fredoka,sans-serif;box-shadow:none}
+.dots button[aria-pressed=true]{background:#f5c518}
+.lvls{display:flex;gap:6px}.lvls button{display:flex;align-items:center;gap:6px;min-height:40px;padding:4px 12px 4px 6px;border-radius:999px;background:#fff;color:#3a2622;box-shadow:inset 0 0 0 2px #e6d6c6;font:700 14px Nunito,sans-serif}
+.lvls button span.pw{display:flex;margin-right:4px}.lvls button img{height:26px;margin-right:-9px}.lvls button img:last-child{margin-right:0}.lvls button[aria-pressed=true]{background:#3a2622;color:#fff;box-shadow:none}
+.hint{margin:0 16px 4px;color:#7a645c;font-size:13px}.hint:empty{display:none}
+.exts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.ext1{position:relative;display:flex;align-items:center;gap:10px;padding:8px;border-radius:14px;background:#fff;box-shadow:inset 0 0 0 2px #e6d6c6;cursor:pointer}
+.ext1 input{position:absolute;opacity:0;pointer-events:none}.ext1 img{width:38px;border-radius:5px;box-shadow:0 2px 5px rgba(0,0,0,.18)}.ext1 img.sq{width:44px}
+.ext1 .et{display:flex;flex-direction:column;line-height:1.15}.ext1 b{font:600 15px Fredoka,sans-serif}.ext1 small{color:#7a645c;font-size:12px}
+.ext1 .tick{position:absolute;top:-7px;right:-7px;width:24px;height:24px;border-radius:50%;background:#86c040;color:#fff;font-weight:800;display:none;place-items:center;border:2px solid #fff}
+.ext1:has(input:checked){box-shadow:inset 0 0 0 3px #3a2622;background:#fffbea}.ext1:has(input:checked) .tick{display:grid}
+.ext1:has(input:focus-visible){outline:3px solid var(--accent)}
+.secbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 18px 0}.secbtns button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:999px;font-size:14px;color:#3a2622;box-shadow:inset 0 0 0 2px #e6d6c6;background:#fff}.secbtns img{height:26px}
+.bigbtn{width:100%;min-height:54px;border-radius:999px;font:400 18px Yum,Fredoka,sans-serif;text-transform:uppercase;letter-spacing:.6px;background:#3a2622;color:#fff;box-shadow:0 5px 0 #1f1210}
+.bigbtn:active{transform:translateY(3px);box-shadow:0 2px 0 #1f1210}
+#soloBox,#onlineBox{padding:12px 18px 0}#onlineBox input{border-radius:999px}
+.home .homelinks{margin:14px 18px 18px}
+@media(max-width:480px){.hrow{flex-direction:column;align-items:stretch;border-radius:20px}.exts{grid-template-columns:1fr}.namebox{max-width:none}}
 .homelinks{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-top:16px;padding-top:14px;border-top:2px dashed #efe2d3}
-.homelinks a{color:#3a2622;font-weight:700}.ruleslbl{color:#7a645c;font-size:14px}
+.homelinks a{color:#3a2622;font-weight:700;margin-right:12px}.ruleslbl{color:#7a645c;font-size:14px}
 .coach{position:fixed;right:18px;bottom:18px;width:min(380px,calc(100vw - 36px));background:#3a2622;color:#fff;border-radius:18px;padding:14px 16px;z-index:60;box-shadow:0 14px 40px rgba(0,0,0,.35);font-size:15px;line-height:1.4}
 .coach b{font-family:Fredoka,sans-serif;font-size:17px;display:block;margin-bottom:4px}.coach .cbtn{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
 .coach button{min-height:36px;padding:6px 12px;background:#f4c84a;color:#3a2622}.coach button.ghost{background:transparent;color:#fff;box-shadow:inset 0 0 0 2px rgba(255,255,255,.4)}
@@ -154,29 +186,32 @@ table.sc tr.win td{font-weight:800;background:light-dark(#fff3c8,#3b3218)}
       <img class="pw p3" src="img/pawn_white.png" alt=""><img class="pw p4" src="img/pawn_acorn.png" alt="">
     </div>
   </div>
-  <div class="setupcard">
-    <h2 class="ttl" data-i18n="setupTitle"></h2>
-    <div class="seg" id="tabs" style="margin-top:6px"></div>
-    <div class="field"><label class="h" for="pname" data-i18n="nameLabel"></label><input id="pname" type="text" value="" maxlength="16"></div>
-    <div class="field"><label class="h" data-i18n="nLabel"></label><div class="seg" id="nseg"></div><p id="nhint" style="margin:6px 0 0;color:var(--soft);font-size:14px"></p></div>
-    <div class="field"><label class="h" data-i18n="level"></label><div class="seg" id="lvseg"></div><p id="lvhint" style="margin:6px 0 0;color:var(--soft);font-size:14px"></p></div>
-    <div class="field"><label class="h" data-i18n="extLabel"></label>
-      <label class="check"><input type="checkbox" id="xwild"><div><b>Wild Friends <small class="ext" data-i18n="ext1"></small></b><span data-i18n="wildDesc"></span></div></label>
-      <label class="check"><input type="checkbox" id="xfest"><div><b>Festivals <small class="ext" data-i18n="ext2"></small></b><span data-i18n="festDesc"></span></div></label>
+  <div class="setupcard home">
+    <div class="modetabs" id="tabs"></div>
+    <div class="hpanel">
+      <div class="hrow"><span class="hl2" data-i18n="nameLabel"></span><label class="namebox"><img src="img/pawn_green.png" alt=""><input id="pname" type="text" value="" maxlength="16" aria-label="name"></label></div>
+      <div class="hrow"><span class="hl2" data-i18n="nLabel"></span><div class="dots" id="nseg"></div></div>
+      <p id="nhint" class="hint"></p>
+      <div class="hrow"><span class="hl2" data-i18n="level"></span><div class="lvls" id="lvseg"></div></div>
+      <p id="lvhint" class="hint"></p>
+      <div class="hrow col"><span class="hl2" data-i18n="extLabel"></span>
+        <div class="exts">
+          <label class="ext1"><input type="checkbox" id="xwild"><img src="img/wp4.jpg" alt=""><span class="et"><b>Wild Friends</b><small data-i18n="ext1"></small></span><span class="tick">✓</span></label>
+          <label class="ext1"><input type="checkbox" id="xfest"><img src="img/f13.jpg" alt="" class="sq"><span class="et"><b>Festivals</b><small data-i18n="ext2"></small></span><span class="tick">✓</span></label>
+        </div>
+        <p class="hint" id="exthint"></p>
+      </div>
     </div>
-    <div id="soloBox"><button id="start" style="width:100%;font-size:17px" data-i18n="start"></button></div>
+    <div id="soloBox"><button id="start" class="bigbtn" data-i18n="start"></button></div>
     <div id="onlineBox">
       <p id="netoff" style="color:var(--accent);font-weight:700" data-i18n="netoff"></p>
-      <button id="create" style="width:100%;font-size:17px" data-i18n="create"></button>
+      <button id="create" class="bigbtn" data-i18n="create"></button>
       <div style="display:flex;gap:8px;margin-top:10px"><input id="rcode" type="text" data-i18n-ph="rcodePh" maxlength="5" style="text-transform:uppercase"><button id="join" class="ghost" style="flex:none" data-i18n="join"></button></div>
       <p id="netmsg" style="color:var(--soft);font-size:14px;min-height:20px"></p>
     </div>
-    <div class="homelinks"><button type="button" class="ghost" id="tuto" data-i18n="tutorial"></button>
-      <span class="ruleslbl" data-i18n="rulesLbl"></span>
-      <a href="rules/Minikin_City_Rules_EN.pdf" target="_blank" rel="noopener" data-i18n="rulesBase"></a>
-      <a href="rules/Minikin_City_Wild_Friends_EN.pdf" target="_blank" rel="noopener">Wild Friends</a>
-      <a href="rules/Minikin_City_Festivals_EN.pdf" target="_blank" rel="noopener">Festivals (EN)</a>
-      <a href="rules/Minikin_City_Festivals_FR.pdf" target="_blank" rel="noopener">Festivals (FR)</a></div>
+    <div class="secbtns"><button type="button" class="ghost" id="tuto"><img src="img/pawn_white.png" alt=""><span data-i18n="tutorial"></span></button><button type="button" class="ghost" id="statsBtn"><img src="img/icons/laurel.png" alt=""><span data-i18n="tabStats"></span></button></div>
+    <div class="homelinks"><span class="ruleslbl" data-i18n="rulesLbl"></span>
+      <span id="rulelinks"></span></div>
   </div>
 </section>
 
@@ -226,11 +261,11 @@ table.sc tr.win td{font-weight:800;background:light-dark(#fff3c8,#3b3218)}
 <div id="zoom"><img alt=""></div>
 <div id="modal"></div>
 <div id="coach"></div>
-<script src="config.js?v=8"></script>
-<script src="i18n.js?v=8"></script>
-<script src="data.js?v=8"></script>
-<script src="net.js?v=8"></script>
-<script src="engine.js?v=8"></script>
-<script src="ui.js?v=8"></script>
+<script src="config.js?v=9"></script>
+<script src="i18n.js?v=9"></script>
+<script src="data.js?v=9"></script>
+<script src="net.js?v=9"></script>
+<script src="engine.js?v=9"></script>
+<script src="ui.js?v=9"></script>
 </body>
 </html>
