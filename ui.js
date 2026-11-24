@@ -441,7 +441,7 @@ $('sclear').addEventListener('click', () => { const all = loadBatches(); delete 
 $('statsBack').addEventListener('click', () => { if (worker) { worker.terminate(); worker = null; } show('setup'); });
 $('srun').addEventListener('click', () => {
   if (worker) worker.terminate();
-  try { worker = new Worker('sim-worker.js?v=10'); } catch (e) { $('sprog').textContent = e.message; return; }
+  try { worker = new Worker('sim-worker.js?v=11'); } catch (e) { $('sprog').textContent = e.message; return; }
   $('srun').disabled = true; $('sbar').firstElementChild.style.width = '0'; $('sprog').textContent = t('running', { p: 0 });
   worker.onmessage = (e) => {
     const d = e.data;

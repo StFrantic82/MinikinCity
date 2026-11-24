@@ -231,9 +231,9 @@ STATS.it.lvHint = { easy: 'L’IA originale, regolata a mano.', normal: 'L’IA 
 STATS.fr.cum = 'cumulées (max {m}, les plus anciennes sont remplacées)'; STATS.fr.clearStats = 'Effacer les résultats';
 STATS.en.cum = 'combined (max {m}, oldest are replaced)'; STATS.en.clearStats = 'Clear results';
 STATS.it.cum = 'cumulate (max {m}, le più vecchie vengono sostituite)'; STATS.it.clearStats = 'Cancella i risultati';
-Object.assign(STATS.fr, { home: 'Accueil', tutorial: 'Tutoriel (première partie)', rulesLbl: 'Règles :', rulesBase: 'Jeu de base' });
-Object.assign(STATS.en, { home: 'Home', tutorial: 'Tutorial (first game)', rulesLbl: 'Rules:', rulesBase: 'Base game' });
-Object.assign(STATS.it, { home: 'Home', tutorial: 'Tutorial (prima partita)', rulesLbl: 'Regole:', rulesBase: 'Gioco base' });
+Object.assign(STATS.fr, { home: 'Accueil', tutorial: 'Tutoriel', rulesLbl: 'Règles :', rulesBase: 'Jeu de base' });
+Object.assign(STATS.en, { home: 'Home', tutorial: 'Tutorial', rulesLbl: 'Rules:', rulesBase: 'Base game' });
+Object.assign(STATS.it, { home: 'Home', tutorial: 'Tutorial', rulesLbl: 'Regole:', rulesBase: 'Gioco base' });
 Object.assign(FR, STATS.fr); Object.assign(EN, STATS.en); Object.assign(IT, STATS.it);
 const TUTO = {
   fr: {
