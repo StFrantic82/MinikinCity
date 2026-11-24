@@ -76,7 +76,7 @@ function drawRules() {
   const L = LANG, f = { fr: 'FR', en: 'EN', it: 'IT' }[L];
   const fest = { FR: 'Minikin_City_Festivals_FR.pdf', EN: 'Minikin_City_Festivals_EN.pdf', IT: 'Minikin_City_Festivals_IT.pdf' }[f];
   const tag = (x) => x !== f ? ` <small>(${x})</small>` : '';
-  const base = /github\.io$|localhost|127\.0\.0\.1/.test(location.hostname) ? 'rules/' : 'https://stfrantic82.github.io/MinikinCity/rules/';
+  const base = 'rules/';
   $('rulelinks').innerHTML = `<a href="${base}Minikin_City_Rules_EN.pdf" target="_blank" rel="noopener">${t('rulesBase')}${tag('EN')}</a> <a href="${base}Minikin_City_Wild_Friends_EN.pdf" target="_blank" rel="noopener">Wild Friends${tag('EN')}</a> <a href="${base}${fest}" target="_blank" rel="noopener">Festivals</a>`;
 }
 $('nseg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { nPlayers = +b.dataset.n; drawSeg(); } });
