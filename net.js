@@ -10,6 +10,7 @@ const NetFirebase = {
     if (this.uid) return this.uid;
     for (const m of ['app', 'auth', 'database']) await loadScript(`https://www.gstatic.com/firebasejs/${FB}/firebase-${m}-compat.js`);
     if (!firebase.apps.length) firebase.initializeApp(cfg);
+    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION); // une identité par onglet
     await firebase.auth().signInAnonymously();
     this.db = firebase.database(); this.uid = firebase.auth().currentUser.uid; return this.uid;
   },
