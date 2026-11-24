@@ -228,6 +228,9 @@ STATS.en.level = 'Computer level'; STATS.en.lvEasy = 'Easy'; STATS.en.lvNormal =
 STATS.en.lvHint = { easy: 'The original hand-tuned AI.', normal: 'The AI trained over thousands of games against itself.', hard: 'The trained AI that also simulates possible endings before each card it plays.' };
 STATS.it.level = 'Livello del computer'; STATS.it.lvEasy = 'Facile'; STATS.it.lvNormal = 'Normale'; STATS.it.lvHard = 'Difficile';
 STATS.it.lvHint = { easy: 'L’IA originale, regolata a mano.', normal: 'L’IA allenata con migliaia di partite contro sé stessa.', hard: 'L’IA allenata che in più simula possibili finali prima di ogni carta giocata.' };
+STATS.fr.cum = 'cumulées (max {m}, les plus anciennes sont remplacées)'; STATS.fr.clearStats = 'Effacer les résultats';
+STATS.en.cum = 'combined (max {m}, oldest are replaced)'; STATS.en.clearStats = 'Clear results';
+STATS.it.cum = 'cumulate (max {m}, le più vecchie vengono sostituite)'; STATS.it.clearStats = 'Cancella i risultati';
 Object.assign(FR, STATS.fr); Object.assign(EN, STATS.en); Object.assign(IT, STATS.it);
 window.MK_I18N = { fr: FR, en: EN, it: IT, FEST };
 }

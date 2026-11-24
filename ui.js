@@ -389,23 +389,51 @@ function endModal() {
 }
 
 // ---------- statistiques (simulations entre IA) ----------
-let SN = 3, SG = 200, SRES = null, SSORT = 'edge', SFILT = 'all', worker = null;
-function openStats() { $('swild').checked = $('xwild').checked; $('sfest').checked = $('xfest').checked; SN = nPlayers; show('stats'); drawStatCtl(); drawStats(); }
+let SN = 3, SG = 500, SRES = null, SSORT = 'edge', SFILT = 'all', worker = null;
+// cumul des simulations par configuration (3 000 parties max, les plus anciennes sont retirées)
+const SMAX = 3000;
+const cfgKey = () => `${SN}-${$('swild').checked ? 1 : 0}-${$('sfest').checked ? 1 : 0}`;
+function loadBatches() { try { return JSON.parse(localStorage.getItem('mk-stats') || '{}'); } catch (e) { return {}; } }
+function saveBatches(all) { try { localStorage.setItem('mk-stats', JSON.stringify(all)); } catch (e) {} }
+function addBatch(d) {
+  const all = loadBatches(), k = cfgKey(); const list = all[k] || [];
+  list.push({ card: d.card, fest: d.fest, tok: d.tok, avg: d.avg, games: d.games - d.errors, n: d.n });
+  let tot = list.reduce((a, b) => a + b.games, 0);
+  while (tot > SMAX && list.length) {
+    const b = list[0], excess = tot - SMAX;
+    if (b.games <= excess) { tot -= b.games; list.shift(); continue; }
+    const f = (b.games - excess) / b.games; // on ne garde qu’une partie du plus ancien lot
+    for (const key of ['card', 'fest', 'tok']) for (const s of Object.values(b[key] || {})) for (const k in s) s[k] *= f;
+    b.games -= excess; tot = SMAX;
+  }
+  all[k] = list; saveBatches(all); SRES = merge(list);
+}
+function merge(list) {
+  if (!list || !list.length) return null;
+  const sum = (key) => { const o = {}; for (const b of list) for (const [id, s] of Object.entries(b[key] || {})) { const t = o[id] = o[id] || {}; for (const f in s) t[f] = (t[f] || 0) + s[f]; } return o; };
+  const games = list.reduce((a, b) => a + b.games, 0), avg = {};
+  for (const f of Object.keys(list[0].avg)) avg[f] = list.reduce((a, b) => a + b.avg[f] * b.games, 0) / games;
+  return { card: sum('card'), fest: sum('fest'), tok: sum('tok'), avg, games, errors: 0, n: list[0].n };
+}
+function refreshCum() { SRES = merge(loadBatches()[cfgKey()]); drawStats(); }
+function openStats() { $('swild').checked = $('xwild').checked; $('sfest').checked = $('xfest').checked; SN = nPlayers; show('stats'); drawStatCtl(); refreshCum(); }
 function drawStatCtl() {
   $('snseg').innerHTML = [2, 3, 4, 5].map(n => `<button type="button" aria-pressed="${n === SN}" data-sn="${n}">${n}</button>`).join('');
-  $('sgseg').innerHTML = [100, 200, 500, 1000].map(n => `<button type="button" aria-pressed="${n === SG}" data-sg="${n}">${n}</button>`).join('');
+  $('sgseg').innerHTML = [100, 500, 1000, 3000].map(n => `<button type="button" aria-pressed="${n === SG}" data-sg="${n}">${n}</button>`).join('');
 }
-$('snseg').addEventListener('click', e => { const b = e.target.closest('[data-sn]'); if (b) { SN = +b.dataset.sn; drawStatCtl(); } });
+$('snseg').addEventListener('click', e => { const b = e.target.closest('[data-sn]'); if (b) { SN = +b.dataset.sn; drawStatCtl(); refreshCum(); } });
 $('sgseg').addEventListener('click', e => { const b = e.target.closest('[data-sg]'); if (b) { SG = +b.dataset.sg; drawStatCtl(); } });
+$('swild').addEventListener('change', refreshCum); $('sfest').addEventListener('change', refreshCum);
+$('sclear').addEventListener('click', () => { const all = loadBatches(); delete all[cfgKey()]; saveBatches(all); refreshCum(); });
 $('statsBack').addEventListener('click', () => { if (worker) { worker.terminate(); worker = null; } show('setup'); });
 $('srun').addEventListener('click', () => {
   if (worker) worker.terminate();
-  try { worker = new Worker('sim-worker.js?v=6'); } catch (e) { $('sprog').textContent = e.message; return; }
+  try { worker = new Worker('sim-worker.js?v=7'); } catch (e) { $('sprog').textContent = e.message; return; }
   $('srun').disabled = true; $('sbar').firstElementChild.style.width = '0'; $('sprog').textContent = t('running', { p: 0 });
   worker.onmessage = (e) => {
     const d = e.data;
     if (d.progress !== undefined) { $('sbar').firstElementChild.style.width = (d.progress * 100) + '%'; $('sprog').textContent = t('running', { p: Math.round(d.progress * 100) }); }
-    if (d.done) { SRES = d; worker.terminate(); worker = null; $('srun').disabled = false; $('sprog').textContent = ''; drawStats(); }
+    if (d.done) { addBatch(d); worker.terminate(); worker = null; $('srun').disabled = false; $('sprog').textContent = ''; drawStats(); }
   };
   worker.onerror = (e) => { $('sprog').textContent = 'Erreur : ' + e.message; $('srun').disabled = false; };
   worker.postMessage({ n: SN, games: SG, fest: $('sfest').checked, wild: $('swild').checked });
@@ -419,17 +447,17 @@ function drawStats() {
   const box = $('sres');
   if (!SRES) { box.innerHTML = `<p style="color:var(--soft);margin-top:16px">${t('none')}</p>`; return; }
   const r = SRES, n = r.n, base = 1 / n, minG = Math.max(8, r.games * n * 0.02);
-  const rows = Object.entries(r.card).map(([id, s]) => ({ id, c: CARD[id], games: s.games, win: s.wins / s.games, edge: (s.wins / s.games) / base - 1, owner: s.total / s.games, vp: s.vp / s.games, act: s.scoringGames ? s.active / s.scoringGames : null }))
+  const rows = Object.entries(r.card).filter(([id, s]) => s.games >= 0.5).map(([id, s]) => ({ id, c: CARD[id], games: Math.round(s.games), win: s.wins / s.games, edge: (s.wins / s.games) / base - 1, owner: s.total / s.games, vp: s.vp / s.games, act: s.scoringGames ? s.active / s.scoringGames : null }))
     .filter(x => x.c && (SFILT === 'all' || (SFILT === 'pets' ? x.c.pet : !x.c.pet && x.c.color === SFILT)));
   const key = { edge: x => x.edge, games: x => x.games, win: x => x.win, owner: x => x.owner, vp: x => x.vp, act: x => x.act ?? -1, name: x => -(x.c.value) }[SSORT] || (x => x.edge);
   rows.sort((a, b) => key(b) - key(a));
   const edgeCell = (e) => `<span class="edge ${e >= 0 ? 'pos' : 'neg'}">${e >= 0 ? '+' : ''}${Math.round(e * 100)} %</span>`;
   const th = (k, label) => `<th data-sort="${k}">${label}${SSORT === k ? ' ▾' : ''}</th>`;
   const filt = ['all', 'pink', 'green', 'blue'].concat(r.card.wp4 || r.card.wb1 ? ['pets'] : []).map(f => `<button type="button" data-filt="${f}" aria-pressed="${f === SFILT}">${f === 'all' ? t('fAll') : f === 'pets' ? t('fPets') : LD().color[f]}</button>`).join('');
-  const festRows = Object.entries(r.fest || {}).map(([k, s]) => ({ f: D.FESTIVALS[k - 1], avg: s.total / s.games, spread: s.vp / s.games, games: s.games })).sort((a, b) => b.avg - a.avg);
-  const tokRows = Object.entries(r.tok || {}).map(([id, s]) => ({ id, games: s.games, edge: (s.wins / s.games) / base - 1, owner: s.total / s.games })).sort((a, b) => b.edge - a.edge);
+  const festRows = Object.entries(r.fest || {}).map(([k, s]) => ({ f: D.FESTIVALS[k - 1], avg: s.total / s.games, spread: s.vp / s.games, games: Math.round(s.games) })).sort((a, b) => b.avg - a.avg);
+  const tokRows = Object.entries(r.tok || {}).map(([id, s]) => ({ id, games: Math.round(s.games), edge: (s.wins / s.games) / base - 1, owner: s.total / s.games })).sort((a, b) => b.edge - a.edge);
   box.innerHTML = `
-    <div class="kpis"><div class="kpi"><b>${r.games - r.errors}</b><span>${t('sGames')}</span></div><div class="kpi"><b>${r.avg.win.toFixed(1)}</b><span>${t('avgWin')}</span></div><div class="kpi"><b>${r.avg.all.toFixed(1)}</b><span>${t('avgAll')}</span></div></div>
+    <div class="kpis"><div class="kpi"><b>${Math.round(r.games - r.errors)}</b><span>${t('sGames')} · ${t('cum', { m: SMAX.toLocaleString(LANG) })}</span></div><div class="kpi"><b>${r.avg.win.toFixed(1)}</b><span>${t('avgWin')}</span></div><div class="kpi"><b>${r.avg.all.toFixed(1)}</b><span>${t('avgAll')}</span></div></div>
     <p style="margin:0 0 4px">${t('split', { a: r.avg.markers.toFixed(1), b: r.avg.tokens.toFixed(1), c: r.avg.cards.toFixed(1), d: r.avg.ck.toFixed(1) })}</p>
     <p style="margin:0 0 10px;color:var(--soft)">${t('baseline', { n, p: Math.round(base * 100) })} ${t('note')}</p>
     <div class="zone"><div class="filters">${filt}</div><div class="scroll"><table class="stab">
