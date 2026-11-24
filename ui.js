@@ -280,7 +280,7 @@ function render() {
     if (V.festOn) { const fr = V.festRow[i]; const src = fr.shown ? `img/f${fr.n}.jpg` : `img/fb_${fr.season}.jpg`; fest = `<img class="fest" src="${src}" alt="${fr.shown ? esc(fr.name) : t('hiddenFest')}"${fr.shown ? ` data-zoom="${src}"` : ''}>`; }
     let mk = '';
     if (i < 8) for (const p of V.players) for (const m of p.markers) if (m.round === i) mk += `<span class="mk" style="top:${(rowStart(V.n) + m.pos * 0.1325) * 100}%;background:${p.color}" title="${esc(p.name)}"></span>`;
-    const tile = i === 8 ? `<img class="tile" src="img/end_${V.n}.png" alt="${t('endTile')}" data-zoom="img/end_${V.n}.png">` : '';
+    const tile = i === 8 ? `<div class="under" style="background:${({ pink: '#ee5782', green: '#94b539', blue: '#4a8db7' })[rc.color] || '#8f9190'}"></div><img class="tile" src="img/end_${V.n}.png" alt="${t('endTile')}" data-zoom="img/end_${V.n}.png">` : '';
     y += `<div class="ycol ${i === V.round ? 'now' : ''}"><span class="n">${i < 8 ? i + 1 : t('endCol')}</span>${fest}<div class="rcard"><img src="img/${rc.img}.jpg" alt="${t('rewardCard')}" data-zoom="img/${rc.img}.jpg">${tile}${mk}</div></div>`;
   }
   $('year').innerHTML = y;
@@ -466,7 +466,7 @@ $('sclear').addEventListener('click', () => { if (SSRC === 'ai') { const all = l
 $('statsBack').addEventListener('click', () => { if (worker) { worker.terminate(); worker = null; } show('setup'); });
 $('srun').addEventListener('click', () => {
   if (worker) worker.terminate();
-  try { worker = new Worker('sim-worker.js?v=14'); } catch (e) { $('sprog').textContent = e.message; return; }
+  try { worker = new Worker('sim-worker.js?v=18'); } catch (e) { $('sprog').textContent = e.message; return; }
   $('srun').disabled = true; $('sbar').firstElementChild.style.width = '0'; $('sprog').textContent = t('running', { p: 0 });
   worker.onmessage = (e) => {
     const d = e.data;
