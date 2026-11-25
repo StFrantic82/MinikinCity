@@ -57,7 +57,7 @@ const CITY = [
   C('b2', 'blue', 2, ['S'], 'I', 0, FLAT({ m: 4 })),
   C('b3', 'blue', 3, ['G'], 'S', 2, PER('cset', { vp: 3 })),
   C('b4', 'blue', 4, ['H'], 'S', 3, PER('H', { vp: 2 })),
-  C('b5', 'blue', 5, ['W'], '', 0, null),
+  C('b5', 'blue', 5, ['B', 'H', 'S', 'G'], '', 0, null),
   C('b6', 'blue', 6, [], 'I', 0, FLAT({ m: 2, bonus: 1 })),
   C('b7', 'blue', 7, ['G', 'G'], 'S', 2, IF({ green: 4 }, { vp: 5 })),
   C('b8', 'blue', 8, ['B'], 'I', 0, IF({ B: 2 }, { m: 3 })),
